@@ -34,8 +34,6 @@ def run_path() -> Path:
 
 APP_DIR = app_path()
 
-# CLASSES
-CLASSES_DIR = APP_DIR / "classes"
 
 # STATIC FILES
 STATIC_DIR = APP_DIR / "static"
@@ -64,7 +62,7 @@ CONFIG_DIR = APP_DIR / "camera_sdk"
 RUN_DIR = run_path()
 
 # App-specific runtime folder
-RUN_DIR = RUN_DIR / "App_Data"
+RUN_DIR = RUN_DIR / "Sliver_Data"
 RUN_DIR.mkdir(parents=True, exist_ok=True)
 
 # DATA DIRECTORIES
