@@ -266,8 +266,7 @@ function disableSideMenu() {
     document.getElementById("menuController"),
     document.getElementById("menuTraining"),
     document.getElementById("menuSettings"),
-    document.getElementById("jobIdInput"),
-    document.getElementById("thresholdInput"),
+
   ];
 
   menuItems.forEach((item) => {
@@ -286,8 +285,7 @@ function enableSideMenu() {
     document.getElementById("menuController"),
     document.getElementById("menuTraining"),
     document.getElementById("menuSettings"),
-    document.getElementById("jobIdInput"),
-    document.getElementById("thresholdInput"),
+ 
   ];
 
   menuItems.forEach((item) => {
@@ -307,9 +305,14 @@ function checkCanConfirm() {
 }
 
 // ─── Confirm Configuration ──────────────────────────────────────────
+// ─── Confirm Configuration ──────────────────────────────────────────
+// ─── Confirm Configuration ──────────────────────────────────────────
 function confirmConfig() {
-  const jobId = document.getElementById("jobIdInput").value;
-  const threshold = document.getElementById("thresholdInput").value.trim();
+  const jobIdInput = document.getElementById("jobIdInput");
+  const thresholdInput = document.getElementById("thresholdInput");
+
+  const jobId = jobIdInput ? jobIdInput.value.trim() : "";
+  const threshold = thresholdInput ? thresholdInput.value.trim() : "";
 
   if (!jobId || !threshold) {
     showToast("❌ Please select Job ID and enter Threshold", 3000, "error");
@@ -320,17 +323,135 @@ function confirmConfig() {
   currentThreshold = threshold;
   document.getElementById("jobIdLabel").textContent = jobId;
 
-  // Persist confirmed values immediately (no debounce)
+  // Save to config
   writeUserConfig(jobId, threshold);
 
   showToast(
     `✅ Configuration Confirmed!<br>Job: ${jobId} | Threshold: ${threshold}`,
-    4000,
+    4000
   );
   addLog(`Configuration Confirmed → Job: ${jobId}, Threshold: ${threshold}`);
 
+  // Make inputs NON-EDITABLE immediately after OK
+  makeInputsNonEditable();
+
+  // Enable Start button, disable OK button
   document.getElementById("startBtn").disabled = false;
   document.getElementById("okBtn").disabled = true;
+}
+
+// Make Job ID and Threshold inputs non-editable with visual feedback
+function makeInputsNonEditable() {
+  const jobIdInput = document.getElementById("jobIdInput");
+  const thresholdInput = document.getElementById("thresholdInput");
+
+  if (jobIdInput) {
+    jobIdInput.disabled = true;
+    jobIdInput.style.opacity = "0.6";
+    jobIdInput.style.backgroundColor = "#1f1f1f";
+    jobIdInput.style.cursor = "not-allowed";
+    jobIdInput.style.pointerEvents = "none";
+  }
+
+  if (thresholdInput) {
+    thresholdInput.disabled = true;
+    thresholdInput.style.opacity = "0.6";
+    thresholdInput.style.backgroundColor = "#1f1f1f";
+    thresholdInput.style.cursor = "not-allowed";
+    thresholdInput.style.pointerEvents = "none";
+  }
+}
+
+// Re-enable inputs (used in Reset and when stopping detection)
+function makeInputsEditable() {
+  const jobIdInput = document.getElementById("jobIdInput");
+  const thresholdInput = document.getElementById("thresholdInput");
+
+  if (jobIdInput) {
+    jobIdInput.disabled = false;
+    jobIdInput.style.opacity = "1";
+    jobIdInput.style.backgroundColor = "";
+    jobIdInput.style.cursor = "pointer";
+    jobIdInput.style.pointerEvents = "auto";
+  }
+
+  if (thresholdInput) {
+    thresholdInput.disabled = false;
+    thresholdInput.style.opacity = "1";
+    thresholdInput.style.backgroundColor = "";
+    thresholdInput.style.cursor = "text";
+    thresholdInput.style.pointerEvents = "auto";
+  }
+}
+
+// ─── Reset Configuration ────────────────────────────────────────────
+function resetConfig() {
+  const jobIdInput = document.getElementById("jobIdInput");
+  const thresholdInput = document.getElementById("thresholdInput");
+
+  if (jobIdInput) jobIdInput.value = "";
+  if (thresholdInput) thresholdInput.value = "";
+
+  currentJobId = "";
+  currentThreshold = "";
+  document.getElementById("jobIdLabel").textContent = "—";
+
+  makeInputsEditable();     // Make editable again
+  enableSideMenu();
+
+  document.getElementById("startBtn").disabled = true;
+  document.getElementById("okBtn").disabled = true;
+
+  writeUserConfig("", "");
+
+  showToast("Configuration Reset", 2500);
+  addLog("Configuration Reset");
+}
+
+// Function to completely hide the inputs
+function hideConfigInputs() {
+  const jobIdInput = document.getElementById("jobIdInput");
+  const thresholdInput = document.getElementById("thresholdInput");
+
+  if (jobIdInput) {
+    jobIdInput.style.display = "none";
+  }
+  if (thresholdInput) {
+    thresholdInput.style.display = "none";
+  }
+}
+
+// Function to show the inputs again (used in Reset and Stop)
+function showConfigInputs() {
+  const jobIdInput = document.getElementById("jobIdInput");
+  const thresholdInput = document.getElementById("thresholdInput");
+
+  if (jobIdInput) {
+    jobIdInput.style.display = "block";   // or "inline-block" / "flex" depending on your layout
+  }
+  if (thresholdInput) {
+    thresholdInput.style.display = "block";
+  }
+}
+
+// ─── Reset Configuration ────────────────────────────────────────────
+function resetConfig() {
+  document.getElementById("jobIdInput").value = "";
+  document.getElementById("thresholdInput").value = "";
+  currentJobId = "";
+  currentThreshold = "";
+  document.getElementById("jobIdLabel").textContent = "—";
+
+  showConfigInputs();        // Show inputs again
+  enableSideMenu();
+
+  document.getElementById("startBtn").disabled = true;
+  document.getElementById("okBtn").disabled = true;
+
+  writeUserConfig("", "");
+
+  showToast("Configuration Reset", 2500);
+  addLog("Configuration Reset");
 }
 
 // ─── Reset Configuration ────────────────────────────────────────────
