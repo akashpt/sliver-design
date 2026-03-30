@@ -1,0 +1,32 @@
+# Ignore SDK and binaries
+camera_sdk/
+arena_sdk/
+*.dll
+*.lib
+*.pdb
+*.exe# SDK folders
+camera_sdk/
+arena_sdk/
+data/
+# Python virtual environment
+venv/
+env/
+
+# DLL and binaries
+*.dll
+*.lib
+*.exe
+*.pdb
+*.pyd
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Build folders
+build/
+dist/
+
+# Python cache
+__pycache__/
+*.pyc
