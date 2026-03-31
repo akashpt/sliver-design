@@ -26,20 +26,37 @@ let currentStream = null;
 let defectHistory = [];
 let currentModalIndex = -1;
 
-const FIXED_DEFECT_IMAGES = [
-  "https://placehold.co/640x480/ff4d6d/white?text=EDGE+SLIVER",
-  "https://placehold.co/640x480/ef233c/fff?text=DENT+DEFECT",
-  "https://picsum.photos/seed/metaldefect1/640/480",
-  "https://placehold.co/640x480/c1121f/white?text=SCRATCH+DEFECT",
-  "https://picsum.photos/seed/industrialdefect/640/480",
-  "https://placehold.co/640x480/d00000/fff?text=CRACK+DETECTED",
-];
 
-// Initialize sample defects
-FIXED_DEFECT_IMAGES.forEach((src) => {
-  defectHistory.push({ time: "Sample", src: src });
+async function loadDefectImagesFromBridge() {
+  try {
+
+    if (!bridge || typeof bridge.get_defect_images !== "function") {
+      console.warn("Bridge not available");
+      return;
+    }
+
+    const raw = await bridge.get_defect_images();
+    const parsed = JSON.parse(raw);
+
+    const images = parsed?.images || [];
+
+    images.forEach((src) => {
+      defectHistory.push({
+        time: "Sample",
+        src: src  
+      });
+    });
+
+    console.log("Defect images loaded from bridge");
+
+  } catch (err) {
+    console.error("Failed loading defect images:", err);
+  }
+}
+document.addEventListener("DOMContentLoaded", () => {
+  
+  loadDefectImagesFromBridge();
 });
-
 // ─── User Config Persistence ─────────────────────────────────────────
 // Manages reading and writing userConfig.json via the Qt bridge.
 // Falls back to localStorage when no bridge is present (browser testing).
@@ -583,8 +600,8 @@ function startDetection() {
     if (isDefect) {
       bad++;
       const randomSrc =
-        FIXED_DEFECT_IMAGES[
-          Math.floor(Math.random() * FIXED_DEFECT_IMAGES.length)
+      [
+          Math.floor(Math.random()  )
         ];
 
       defectHistory.unshift({

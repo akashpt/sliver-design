@@ -85,7 +85,20 @@ class Bridge(QObject):
         return json.dumps(value)
 
     # ------------------- USER CONFIG (NEW) -------------------
-  
+    @pyqtSlot(result=str)
+    def get_defect_images(self):
+        data = {
+            "images": [
+                "https://placehold.co/640x480/ff4d6d/white?text=EDGE+SLIVER",
+                "https://placehold.co/640x480/ef233c/fff?text=DENT+DEFECT",
+                "https://picsum.photos/seed/metaldefect1/640/480",
+                "https://placehold.co/640x480/c1121f/white?text=SCRATCH+DEFECT",
+                "https://picsum.photos/seed/industrialdefect/640/480",
+                "https://placehold.co/640x480/d00000/fff?text=CRACK+DETECTED"
+            ]
+        }
+
+        return json.dumps(data)
 
     @pyqtSlot(str)
     def saveUserConfig(self, json_string):
