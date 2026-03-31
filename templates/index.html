@@ -243,11 +243,7 @@
               onchange="checkCanSave()"
             >
               <option value="" disabled selected hidden>Select Job ID</option>
-              <option value="75">75 - Product A</option>
-              <option value="102">102 - Product B</option>
-              <option value="145">145 - Product C</option>
-              <option value="208">208 - Product D</option>
-              <option value="319">319 - Product E</option>
+              <!-- Options populated dynamically from bridge.getAppConfig() via JS -->
             </select>
           </div>
 
@@ -255,30 +251,30 @@
             <label class="m-label mt-2">Threshold Value</label>
 
             <!-- Hybrid Threshold Container -->
-           <div class="hybrid-threshold" style="position: relative">
-  <input
-    type="text"
-    id="thresholdInput"
-    class="index_input"
-    placeholder="Enter or select Threshold (e.g. 75)"
-    onkeypress="return onlyNumber(event)"
-    oninput="this.value=this.value.replace(/[^0-9]/g,'')"
-    autocomplete="off"
-  />
+            <div class="hybrid-threshold" style="position: relative">
+              <input
+                type="text"
+                id="thresholdInput"
+                class="index_input"
+                placeholder="Enter or select Threshold (e.g. 75)"
+                onkeypress="return onlyNumber(event);"
+                oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+                autocomplete="off"
+              />
 
-  <button
-    type="button"
-    class="dropdown-arrow"
-    onclick="toggleSuggestions()"
-  >
-    <i style="font-size: 12px" class="fas fa-chevron-down"></i>
-  </button>
+              <button
+                type="button"
+                class="dropdown-arrow"
+                onclick="toggleSuggestions()"
+              >
+                <i style="font-size: 12px" class="fas fa-chevron-down"></i>
+              </button>
 
-  <div
-    id="thresholdSuggestionsDiv"
-    class="custom-suggestions"
-  ></div>
-</div>
+              <div
+                id="thresholdSuggestionsDiv"
+                class="custom-suggestions"
+              ></div>
+            </div>
           </div>
         </div>
 
@@ -313,8 +309,7 @@
             <div
               class="defects-slider"
               id="defectsSlider"
-              style="    display: flex;
-    flex-wrap: wrap; gap: 12px; "
+              style="display: flex; flex-wrap: wrap; gap: 12px"
             >
               <!-- Thumbnails will be added by JS -->
             </div>
@@ -499,6 +494,5 @@
     </div>
 
     <script src="../static/script/index.js"></script>
- 
   </body>
 </html>

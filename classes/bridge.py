@@ -2,7 +2,6 @@ import cv2
 import base64
 import json
 import os
-import datetime
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QTimer, QStandardPaths, QDir
 
 
@@ -14,20 +13,22 @@ class Bridge(QObject):
         super().__init__()
         self.app_ref = app_ref
 
-        # Camera
+        # Camera related
         self.cap = None
         self.timer = QTimer()
         self.timer.timeout.connect(self.grab_frame)
 
-        # Config file path
+        # Config file path (persistent across sessions)
         config_dir = QStandardPaths.writableLocation(QStandardPaths.AppConfigLocation)
-        QDir().mkpath(config_dir)
+        QDir().mkpath(config_dir)  # Create folder if it doesn't exist
         self.config_path = os.path.join(config_dir, "userConfig.json")
 
     # ------------------- CAMERA -------------------
     @pyqtSlot(result=str)
     def startCamera(self):
+        """Start the camera and begin sending frames"""
         self.stopCamera()
+
         self.cap = cv2.VideoCapture(0)
 
         if not self.cap.isOpened():
@@ -35,12 +36,14 @@ class Bridge(QObject):
             return "ERROR: Cannot open camera"
 
         print("✅ Camera started successfully")
-        self.timer.start(30)   # ~33 fps
+        self.timer.start(30)  # ~33 fps
         return "OK"
 
     @pyqtSlot()
     def stopCamera(self):
+        """Properly stop camera and timer"""
         print("🛑 Stopping camera...")
+
         if self.timer.isActive():
             self.timer.stop()
 
@@ -64,10 +67,27 @@ class Bridge(QObject):
             except Exception as e:
                 print(f"❌ Error encoding frame: {e}")
 
-    # ------------------- USER CONFIG -------------------
+    # ------------------- DROPDOWN DATA -------------------
     @pyqtSlot(result=str)
-    def readUserConfig(self):
-        """Read userConfig.json"""
+    def current_job_id(self):
+        """Return available jobs and thresholds for the UI dropdowns"""
+        data = {
+            "jobs": ["Product A", "Product B", "Product C"],
+            "thresholds": [1, 2, 3, 4, 5, 6],
+        }
+
+        value = {
+            "job_id": "checking",
+            "threshold": "40",
+            "data": data,
+        }
+
+        return json.dumps(value)
+
+    # ------------------- USER CONFIG (NEW) -------------------
+    @pyqtSlot(result=str)
+    def loadUserConfig(self):
+        """Read userConfig.json and return as JSON string"""
         try:
             if os.path.exists(self.config_path):
                 with open(self.config_path, "r", encoding="utf-8") as f:
@@ -75,38 +95,31 @@ class Bridge(QObject):
                 print(f"✅ Loaded userConfig.json: {data}")
                 return json.dumps(data)
             else:
+                # Return default if file doesn't exist
                 default = {"jobId": "", "threshold": "", "lastSaved": ""}
+                print("ℹ️ userConfig.json not found → returning defaults")
                 return json.dumps(default)
         except Exception as e:
             print(f"❌ Error loading userConfig.json: {e}")
-            return json.dumps({"jobId": "", "threshold": "", "lastSaved": ""})
+            default = {"jobId": "", "threshold": "", "lastSaved": ""}
+            return json.dumps(default)
 
     @pyqtSlot(str)
-    def writeUserConfig(self, json_string):
-        """Save userConfig.json"""
+    def saveUserConfig(self, json_string):
+        """Save JSON string to userConfig.json"""
         try:
             data = json.loads(json_string)
-            data["lastSaved"] = datetime.datetime.now().isoformat()
+
+            # Ensure we always have lastSaved timestamp
+            if "lastSaved" not in data:
+                data["lastSaved"] = ""
 
             with open(self.config_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
 
-            print(f"💾 Saved userConfig.json → Job: {data.get('jobId')}, Threshold: {data.get('threshold')}")
+            print(f"💾 Saved userConfig.json → {data}")
         except Exception as e:
             print(f"❌ Failed to save userConfig.json: {e}")
-
-    # ------------------- JOB LIST (via Bridge) -------------------
-    @pyqtSlot(result=str)
-    def getJobList(self):
-        """Return available Job IDs via bridge"""
-        jobs = [
-            {"id": "75", "name": "Product A"},
-            {"id": "102", "name": "Product B"},
-            {"id": "145", "name": "Product C"},
-            {"id": "208", "name": "Product D"},
-            {"id": "319", "name": "Product E"},
-        ]
-        return json.dumps({"jobs": jobs})
 
     # ------------------- NAVIGATION -------------------
     @pyqtSlot()

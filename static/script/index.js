@@ -193,70 +193,96 @@ const autoSaveConfig = debounce(async () => {
   await writeUserConfig(jobId, threshold);
 }, 500);
 
+// ─── Fetch Job IDs & Thresholds from Bridge ─────────────────────────
+async function loadDropdownData() {
+  try {
+    let jobs = [];
+    let thresholds = [];
+    let presetJobId = "";
+    let presetThreshold = "";
 
-// ─── Load Job IDs via Qt Bridge ─────────────────────────────────────
-// This replaces the old fetch("/config.json")
-async function loadJobListFromBridge() {
-  const jobSelect = document.getElementById("jobIdInput");
-  if (!jobSelect) return;
-
-  // Clear and set default option
-  jobSelect.innerHTML = '<option value="" disabled selected hidden>Select Job ID</option>';
-
-  if (bridge && typeof bridge.getJobList === "function") {
-    try {
-      const raw = await bridge.getJobList();
-      if (raw && raw.trim()) {
-        const data = JSON.parse(raw);
-
-        if (data.jobs && Array.isArray(data.jobs)) {
-          data.jobs.forEach((job) => {
-            const option = document.createElement("option");
-            option.value = job.id;
-            option.textContent = `${job.id} - ${job.name || "Product"}`;
-            jobSelect.appendChild(option);
-          });
+    // Primary: Qt bridge → bridge.current_job_id()
+    if (bridge && typeof bridge.current_job_id === "function") {
+      try {
+        const raw = await bridge.current_job_id();
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          jobs          = parsed?.data?.jobs       ?? [];
+          thresholds    = parsed?.data?.thresholds ?? [];
+          presetJobId   = String(parsed?.job_id    ?? "");
+          presetThreshold = String(parsed?.threshold ?? "");
         }
+      } catch (e) {
+        console.warn("[Dropdown] Bridge current_job_id failed:", e);
       }
-    } catch (e) {
-      console.warn("[JobList] Failed to load jobs from bridge:", e);
     }
-  } else {
-    // Fallback for testing in browser (when no Qt bridge)
-    console.warn("Bridge not available → Using hardcoded job list");
-    const fallbackJobs = [
-      { id: "75",  name: "Product A" },
-      { id: "102", name: "Product B" },
-      { id: "145", name: "Product C" },
-      { id: "208", name: "Product D" },
-      { id: "319", name: "Product E" }
-    ];
 
-    fallbackJobs.forEach((job) => {
+    // ── Populate Job ID <select> ──────────────────────────────────────
+    const jobSelect = document.getElementById("jobIdInput");
+    jobSelect.innerHTML =
+      '<option value="" disabled selected hidden>Select Job ID</option>';
+    jobs.forEach((job) => {
       const option = document.createElement("option");
-      option.value = job.id;
-      option.textContent = `${job.id} - ${job.name}`;
+      option.value = job;
+      option.textContent = job;
       jobSelect.appendChild(option);
     });
-  }
 
-  // Resolve pending saved value (from userConfig.json)
-  if (jobSelect.dataset.pendingValue) {
-    const matchingOption = [...jobSelect.options].find(
-      (o) => o.value === jobSelect.dataset.pendingValue
-    );
-    if (matchingOption) {
-      jobSelect.value = jobSelect.dataset.pendingValue;
+    // ── Override THRESHOLD_SUGGESTIONS with bridge values ─────────────
+    if (thresholds.length > 0) {
+      THRESHOLD_SUGGESTIONS.length = 0;
+      thresholds.forEach((t) => THRESHOLD_SUGGESTIONS.push(String(t)));
+    }
+
+    // ── Auto-fill & disable when bridge provides preset values ─────────
+    const thresholdInput = document.getElementById("thresholdInput");
+
+    if (presetJobId) {
+      // Select the matching option in the dropdown
+      const match = [...jobSelect.options].find((o) => o.value === presetJobId);
+      if (match) {
+        jobSelect.value = presetJobId;
+      }
+      // Lock the dropdown — value is set by the system
+      jobSelect.disabled = true;
+      jobSelect.style.opacity = "0.6";
+      jobSelect.style.cursor  = "not-allowed";
+
+      // Mirror into currentJobId so confirmConfig works immediately
+      currentJobId = presetJobId;
+      const label = document.getElementById("jobIdLabel");
+      if (label) label.textContent = presetJobId;
+    }
+
+    if (presetThreshold) {
+      thresholdInput.value    = presetThreshold;
+      thresholdInput.disabled = true;
+      thresholdInput.style.opacity = "0.6";
+      thresholdInput.style.cursor  = "not-allowed";
+
+      currentThreshold = presetThreshold;
+    }
+
+    // If both preset values are present, treat config as already confirmed
+    if (presetJobId && presetThreshold) {
+      document.getElementById("okBtn").disabled   = true;
+      document.getElementById("startBtn").disabled = false;
+      showToast(
+        `🔒 Auto-configured — Job: ${presetJobId} | Threshold: ${presetThreshold}`,
+        4000
+      );
+      addLog(`[Bridge] Auto-config applied → Job: ${presetJobId}, Threshold: ${presetThreshold}`);
+    } else {
       checkCanConfirm();
     }
-    delete jobSelect.dataset.pendingValue;
+
+  } catch (error) {
+    console.error("[Dropdown] loadDropdownData error:", error);
   }
 }
 
 // ─── Bridge & Initialization ────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", function () {
-  loadJobListFromBridge();   // ← New function
-
   new QWebChannel(qt.webChannelTransport, async function (channel) {
     bridge = channel.objects.bridge;
     if (bridge) {
@@ -265,7 +291,8 @@ document.addEventListener("DOMContentLoaded", function () {
       showToast("⚠️ No Qt Bridge - Using Laptop Webcam", 4000, "warning");
     }
 
-    // Load saved config after bridge is ready
+    // Load dropdowns (jobs + thresholds) from bridge, then restore saved config
+    await loadDropdownData();
     await populateInputsFromConfig();
   });
 
@@ -275,9 +302,11 @@ document.addEventListener("DOMContentLoaded", function () {
   const jobIdInput = document.getElementById("jobIdInput");
   const thresholdInput = document.getElementById("thresholdInput");
 
+  // Enable OK button check
   jobIdInput.addEventListener("change", checkCanConfirm);
   thresholdInput.addEventListener("input", checkCanConfirm);
 
+  // Auto-save to userConfig.json on every change (debounced 500 ms)
   jobIdInput.addEventListener("change", autoSaveConfig);
   thresholdInput.addEventListener("input", autoSaveConfig);
 });
@@ -344,6 +373,17 @@ function confirmConfig() {
   currentThreshold = threshold;
   document.getElementById("jobIdLabel").textContent = jobId;
 
+  // Lock both inputs after confirmation
+  const jobSelect      = document.getElementById("jobIdInput");
+  const thresholdInput = document.getElementById("thresholdInput");
+
+  jobSelect.disabled          = true;
+  jobSelect.style.opacity     = "0.6";
+  jobSelect.style.cursor      = "not-allowed";
+  thresholdInput.disabled     = true;
+  thresholdInput.style.opacity = "0.6";
+  thresholdInput.style.cursor  = "not-allowed";
+
   // Persist confirmed values immediately (no debounce)
   writeUserConfig(jobId, threshold);
 
@@ -355,24 +395,31 @@ function confirmConfig() {
 
   document.getElementById("startBtn").disabled = false;
   document.getElementById("okBtn").disabled = true;
-  document.getElementById("jobIdInput").disabled = true;
-  document.getElementById("thresholdInput").disabled = true;
 }
 
 // ─── Reset Configuration ────────────────────────────────────────────
 function resetConfig() {
-  document.getElementById("jobIdInput").disabled = false;
-  document.getElementById("thresholdInput").disabled = false;
-  document.getElementById("jobIdInput").value = "";
-  document.getElementById("thresholdInput").value = "";
-  currentJobId = "";
-  currentThreshold = "";
+  const jobSelect     = document.getElementById("jobIdInput");
+  const thresholdInput = document.getElementById("thresholdInput");
+
+  jobSelect.value      = "";
+  thresholdInput.value = "";
+  currentJobId         = "";
+  currentThreshold     = "";
   document.getElementById("jobIdLabel").textContent = "—";
+
+  // Re-enable fields that may have been locked by bridge preset
+  jobSelect.disabled          = false;
+  jobSelect.style.opacity     = "1";
+  jobSelect.style.cursor      = "pointer";
+  thresholdInput.disabled     = false;
+  thresholdInput.style.opacity = "1";
+  thresholdInput.style.cursor  = "pointer";
 
   enableSideMenu(); // Re-enable menu on reset
 
   document.getElementById("startBtn").disabled = true;
-  document.getElementById("okBtn").disabled = true;
+  document.getElementById("okBtn").disabled    = true;
 
   // Persist the cleared state so next launch starts blank
   writeUserConfig("", "");
