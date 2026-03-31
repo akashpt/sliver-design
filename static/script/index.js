@@ -830,7 +830,7 @@ function addLog(msg) {
 }
 
 // ─── Threshold Suggestions ──────────────────────────────────────────
-const THRESHOLD_SUGGESTIONS = ["50", "60", "75", "80", "85", "90", "95", "100"];
+const THRESHOLD_SUGGESTIONS = [ ""];
 
 function filterSuggestions() {
   const input = document.getElementById("thresholdInput");
