@@ -109,10 +109,12 @@ async function readUserConfig() {
  */
 async function writeUserConfig(jobId, threshold) {
   const payload = {
+   
     jobId: String(jobId ?? ""),
     threshold: String(threshold ?? ""),
     lastSaved: new Date().toISOString(),
   };
+  
   const jsonStr = JSON.stringify(payload, null, 2);
 
   // 1. Qt bridge (primary — true file persistence)
@@ -656,9 +658,9 @@ function setUIState(running) {
   } else {
     startBtn.disabled = false; // ← Fixed: Allow starting again
     stopBtn.disabled = true;
-    jobSelect.disabled = false;
-    thresholdInput.disabled = false;
-    okBtn.disabled = false; // Allow re-config if needed
+    jobSelect.disabled = true;
+    thresholdInput.disabled = true;
+    okBtn.disabled = true; // Allow re-config if needed
     resetBtn.disabled = false;
   }
 }
