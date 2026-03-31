@@ -930,17 +930,3 @@ document.getElementById("settingsModal")?.addEventListener("click", (e) => {
   if (e.target === e.currentTarget) closeSettings();
 });
 
-// Expose to HTML
-window.startDetection = startDetection;
-window.stopDetection = stopDetection;
-window.confirmConfig = confirmConfig;
-window.resetConfig = resetConfig;
-window.checkCanConfirm = checkCanConfirm;
-window.openSettings = openSettings;
-window.closeSettings = closeSettings;
-window.saveSettings = saveSettings;
-window.changeDefect = changeDefect;
-window.closeDefectModal = closeDefectModal;
-window.downloadDefectImage = downloadDefectImage;
-window.filterSuggestions = filterSuggestions;
-window.toggleSuggestions = toggleSuggestions;
