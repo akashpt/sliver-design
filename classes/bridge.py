@@ -85,24 +85,24 @@ class Bridge(QObject):
         return json.dumps(value)
 
     # ------------------- USER CONFIG (NEW) -------------------
-    @pyqtSlot(result=str)
-    def loadUserConfig(self):
-        """Read userConfig.json and return as JSON string"""
-        try:
-            if os.path.exists(self.config_path):
-                with open(self.config_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                print(f"✅ Loaded userConfig.json: {data}")
-                return json.dumps(data)
-            else:
-                # Return default if file doesn't exist
-                default = {"jobId": "", "threshold": "", "lastSaved": ""}
-                print("ℹ️ userConfig.json not found → returning defaults")
-                return json.dumps(default)
-        except Exception as e:
-            print(f"❌ Error loading userConfig.json: {e}")
-            default = {"jobId": "", "threshold": "", "lastSaved": ""}
-            return json.dumps(default)
+    # @pyqtSlot(result=str)
+    # def loadUserConfig(self):
+    #     """Read userConfig.json and return as JSON string"""
+    #     try:
+    #         if os.path.exists(self.config_path):
+    #             with open(self.config_path, "r", encoding="utf-8") as f:
+    #                 data = json.load(f)
+    #             print(f"✅ Loaded userConfig.json: {data}")
+    #             return json.dumps(data)
+    #         else:
+    #             # Return default if file doesn't exist
+    #             default = {"jobId": "", "threshold": "", "lastSaved": ""}
+    #             print("ℹ️ userConfig.json not found → returning defaults")
+    #             return json.dumps(default)
+    #     except Exception as e:
+    #         print(f"❌ Error loading userConfig.json: {e}")
+    #         default = {"jobId": "", "threshold": "", "lastSaved": ""}
+    #         return json.dumps(default)
 
     @pyqtSlot(str)
     def saveUserConfig(self, json_string):
