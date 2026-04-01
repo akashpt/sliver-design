@@ -333,9 +333,9 @@ main {
   position: relative;
   aspect-ratio: 16 / 9;
   width: 100%;
-  height: auto;
-  max-height: 50vh;
-  min-height: 250px;
+  height: 70vh;
+  min-height: 360px; /* safety minimum on small screens */
+  max-height: 85vh;
   display: grid;
   place-items: center;
   box-shadow: var(--shadow-lg);
@@ -733,6 +733,11 @@ select.cam-select:focus {
 .modal {
   position: fixed;
   inset: 0;
+  transform: translate(-50%, -50%);
+  left: 50%;
+  top: 50%;
+  width: 100%;
+  height: 100%;
   background: rgba(31, 41, 55, 0.42);
   display: none;
   align-items: center;
@@ -1345,4 +1350,19 @@ input[type="range"] {
   font-weight: 800;
   text-transform: uppercase;
   margin-top: 15px;
+}
+@media screen and (min-width: 1250px) {
+  .container {
+    grid-template-columns: 300px 1fr 450px;
+  }
+  .btn-start {
+    height: 90px;
+    width: 90px;
+    border-radius: 55px;
+  }
+  .btn-stop {
+    height: 90px;
+    width: 90px;
+    border-radius: 55px;
+  }
 }

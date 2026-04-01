@@ -2,7 +2,9 @@ import cv2
 import base64
 import json
 import os
+from datetime import datetime
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QTimer, QStandardPaths, QDir
+from PyQt5.QtWidgets import QApplication  # Only if needed elsewhere
 
 
 class Bridge(QObject):
@@ -18,18 +20,21 @@ class Bridge(QObject):
         self.timer = QTimer()
         self.timer.timeout.connect(self.grab_frame)
 
-        # Config file path (persistent across sessions)
+        # Config file path
         config_dir = QStandardPaths.writableLocation(QStandardPaths.AppConfigLocation)
-        QDir().mkpath(config_dir)  # Create folder if it doesn't exist
+        QDir().mkpath(config_dir)
         self.config_path = os.path.join(config_dir, "userConfig.json")
 
-    # ------------------- CAMERA -------------------
+    # ====================== CAMERA ======================
+
     @pyqtSlot(result=str)
     def startCamera(self):
-        """Start the camera and begin sending frames"""
-        self.stopCamera()
+        """Start webcam and begin emitting frames"""
+        if self.cap is not None and self.cap.isOpened():
+            print("ℹ  Camera already running.")
+            return "OK"
 
-        self.cap = cv2.VideoCapture(0)
+        self.cap = cv2.VideoCapture(0)  # Change to 1, 2 if needed
 
         if not self.cap.isOpened():
             print("❌ Cannot open camera")
@@ -41,9 +46,7 @@ class Bridge(QObject):
 
     @pyqtSlot()
     def stopCamera(self):
-        """Properly stop camera and timer"""
-        print("🛑 Stopping camera...")
-
+        """Stop camera"""
         if self.timer.isActive():
             self.timer.stop()
 
@@ -52,39 +55,54 @@ class Bridge(QObject):
                 self.cap.release()
             self.cap = None
 
-        print("✅ Camera stopped successfully")
+        print("⏹ Camera stopped.")
 
     def grab_frame(self):
+        """Read frame from camera and emit base64 image"""
+
+        # check camera
         if self.cap is None or not self.cap.isOpened():
             return
 
+        # read frame
         ret, frame = self.cap.read()
-        if ret:
-            try:
-                _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-                jpg_as_text = base64.b64encode(buffer).decode("utf-8")
-                self.frame_signal.emit(jpg_as_text)
-            except Exception as e:
-                print(f"❌ Error encoding frame: {e}")
+        if not ret or frame is None:
+            return
 
-    # ------------------- DROPDOWN DATA -------------------
+        try:
+            # encode frame to jpg
+            success, buffer = cv2.imencode(
+                ".jpg",
+                frame,
+                [cv2.IMWRITE_JPEG_QUALITY, 85]
+            )
+
+            if success:
+                # numpy buffer → bytes → base64 string
+                jpg_base64 = base64.b64encode(
+                    buffer.tobytes()
+                ).decode("utf-8")
+
+                # emit frame to JS
+                self.frame_signal.emit(jpg_base64)
+
+        except Exception as e:
+            print("Frame send error:", e)
+
+    # ====================== OTHER METHODS ======================
+
     @pyqtSlot(result=str)
     def current_job_id(self):
-        """Return available jobs and thresholds for the UI dropdowns"""
         data = {
-            "jobs": ["Product A", "Product B", "Product C"],
-            "thresholds": [1, 2, 3, 4, 5, 6],
-        }
-
-        value = {
             "job_id": "checking",
             "threshold": "40",
-            "data": data,
+            "data": {
+                "jobs": ["Product A", "Product B", "Product C"],
+                "thresholds": [1, 2, 3, 4, 5, 6],
+            },
         }
+        return json.dumps(data)
 
-        return json.dumps(value)
-
-    # ------------------- USER CONFIG (NEW) -------------------
     @pyqtSlot(result=str)
     def get_defect_images(self):
         data = {
@@ -94,30 +112,46 @@ class Bridge(QObject):
                 "https://picsum.photos/seed/metaldefect1/640/480",
                 "https://placehold.co/640x480/c1121f/white?text=SCRATCH+DEFECT",
                 "https://picsum.photos/seed/industrialdefect/640/480",
-                "https://placehold.co/640x480/d00000/fff?text=CRACK+DETECTED"
+                "https://placehold.co/640x480/d00000/fff?text=CRACK+DETECTED",
             ]
         }
-
         return json.dumps(data)
 
     @pyqtSlot(str)
     def saveUserConfig(self, json_string):
-        """Save JSON string to userConfig.json"""
         try:
             data = json.loads(json_string)
-
-            # Ensure we always have lastSaved timestamp
             if "lastSaved" not in data:
-                data["lastSaved"] = ""
-
+                data["lastSaved"] = datetime.now().isoformat()
             with open(self.config_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
-
-            print(f"💾 Saved userConfig.json → {data}")
+            print(f"💾 Saved userConfig.json")
         except Exception as e:
             print(f"❌ Failed to save userConfig.json: {e}")
 
-    # ------------------- NAVIGATION -------------------
+    @pyqtSlot(str)
+    def saveTrainingSession(self, json_str: str):
+        try:
+            data = json.loads(json_str)
+            record = {
+                "jobId": data.get("jobId", ""),
+                "count": data.get("count", ""),
+                "yarn": data.get("yarn", ""),
+                "color": data.get("color", ""),
+                "savedAt": datetime.now().isoformat(timespec="seconds"),
+            }
+
+            session_path = os.path.join(
+                os.path.dirname(self.config_path), "trainingSession.json"
+            )
+            with open(session_path, "w", encoding="utf-8") as f:
+                json.dump(record, f, indent=2)
+
+            print(f"✅ Training session saved: {record['jobId']}")
+        except Exception as e:
+            print(f"❌ saveTrainingSession error: {e}")
+
+    # Navigation
     @pyqtSlot()
     def goHome(self):
         self.app_ref.load_page("index.html")
