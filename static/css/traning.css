@@ -547,7 +547,7 @@ main {
   color: var(--gray-400);
   margin-top: 1px;
 }
-
+ 
 /* ─── RIGHT SIDEBAR ─── */
 .btn-start {
   height: 60px;
@@ -589,6 +589,7 @@ main {
   display: flex;
   justify-content: space-around;
   align-items: center;
+  margin-top: 15px;
 }
 
 .btn-stop {

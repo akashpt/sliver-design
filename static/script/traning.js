@@ -37,15 +37,15 @@ document.addEventListener("DOMContentLoaded", function () {
       console.log("✅ frame_signal connected");
     }
 
-    await loadDropdownData();
-    await populateInputsFromConfig();
+    // await loadDropdownData();
+    // await populateInputsFromConfig();
 
   });
 
 
 
   renderDefectThumbs();
-  resetToInitialState();
+  // resetToInitialState(); 
 
   const jobIdInput = document.getElementById("jobIdInput");
   const thresholdInput = document.getElementById("thresholdInput");
