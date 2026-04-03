@@ -5,6 +5,7 @@ import os
 from datetime import datetime
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QTimer, QStandardPaths, QDir
 from PyQt5.QtWidgets import QApplication  # Only if needed elsewhere
+from classes.mindvision import MindVisionCamera
 
 
 class Bridge(QObject):
@@ -15,8 +16,13 @@ class Bridge(QObject):
         super().__init__()
         self.app_ref = app_ref
 
-        # Camera related
+         # Camera
+        self.camera = None
         self.cap = None
+        self.use_mindvision = False
+        self.camera_open = False
+
+        # Frame timer
         self.timer = QTimer()
         self.timer.timeout.connect(self.grab_frame)
 
@@ -29,73 +35,129 @@ class Bridge(QObject):
 
     @pyqtSlot(result=str)
     def startCamera(self):
-        """Start webcam and begin emitting frames"""
-        if self.cap is not None and self.cap.isOpened():
-            print("ℹ  Camera already running.")
-            return "OK"
+        if self.camera_open:
+            print("⚠️ Camera already running")
+            return
 
-        self.cap = cv2.VideoCapture(0)  # Change to 1, 2 if needed
+        print("🔥 Starting camera...")
 
-        if not self.cap.isOpened():
-            print("❌ Cannot open camera")
-            return "ERROR: Cannot open camera"
+        try:
+            self.camera = MindVisionCamera()
+            self.camera.start()
 
-        print("✅ Camera started successfully")
-        self.timer.start(30)  # ~33 fps
-        return "OK"
+            if self.camera.hCamera != 0:
+                self.use_mindvision = True
+                print("✅ Using MindVision Camera")
+            else:
+                raise Exception("MindVision not available")
+
+        except Exception as e:
+            print("⚠️ MindVision not available:", e)
+
+            self.camera = None
+            self.use_mindvision = False
+
+            self.cap = cv2.VideoCapture(0)
+
+            if not self.cap.isOpened():
+                print("❌ Webcam not available")
+                return
+
+            print("✅ Using Webcam")
+
+        self.camera_open = True
+        self.timer.start(30)
 
     @pyqtSlot()
     def stopCamera(self):
-        """Stop camera"""
-        if self.timer.isActive():
-            self.timer.stop()
+        if not self.camera_open:
+            print("⚠️ Camera already stopped")
+            return
 
-        if self.cap is not None:
-            if self.cap.isOpened():
-                self.cap.release()
+        print("🛑 Stopping camera...")
+
+        self.timer.stop()
+
+        if self.use_mindvision and self.camera:
+            try:
+                self.camera.stop()
+                print("✅ MindVision stopped")
+            except Exception as e:
+                print("❌ MindVision stop error:", e)
+
+            self.camera = None
+
+        if self.cap:
+            self.cap.release()
             self.cap = None
+            print("✅ Webcam released")
 
-        print("⏹ Camera stopped.")
+        self.camera_open = False
+        print("✅ Camera fully stopped")
 
     def grab_frame(self):
-        """Read frame from camera and emit base64 image"""
-
-        # check camera
-        if self.cap is None or not self.cap.isOpened():
-            return
-
-        # read frame
-        ret, frame = self.cap.read()
-        if not ret or frame is None:
-            return
-
         try:
-            # encode frame to jpg
-            success, buffer = cv2.imencode(
-                ".jpg",
-                frame,
-                [cv2.IMWRITE_JPEG_QUALITY, 85]
-            )
+            frame = None
 
-            if success:
-                # numpy buffer → bytes → base64 string
-                jpg_base64 = base64.b64encode(
-                    buffer.tobytes()
-                ).decode("utf-8")
+            # =========================
+            # MINDVISION CAMERA
+            # =========================
+            if self.use_mindvision and self.camera:
+                frame = self.camera.get_frame()
 
-                # emit frame to JS
-                self.frame_signal.emit(jpg_base64)
+                if frame is None:
+                    print("⚠️ MindVision lost → switching to webcam")
+                    self.use_mindvision = False
+                    self.cap = cv2.VideoCapture(0)
+                    return
+
+                # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+            # =========================
+            # WEBCAM
+            # =========================
+            elif self.cap:
+                ret, frame = self.cap.read()
+                if not ret:
+                    return
+
+            else:
+                return
+
+            # =========================
+            # 🔥 ROTATE FRAME
+            # =========================
+            frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
+            # =========================
+            # SAVE CURRENT FRAME
+            # =========================
+            self.current_frame = frame.copy()
+
+            # =========================
+            # SEND TO UI
+            # =========================
+            _, buffer = cv2.imencode(".jpg", frame)
+            jpg = base64.b64encode(buffer).decode("utf-8")
+            self.frame_signal.emit(jpg)
+
+            # =========================
+            # 🔥 RUN DETECTION
+            # =========================
+            # if self.detector and not self.training_running:
+            #     print("🚀 Detection running...")
+            #     self.run_detection()
 
         except Exception as e:
-            print("Frame send error:", e)
+            print("❌ frame error:", e)
 
     # ====================== OTHER METHODS ======================
 
     @pyqtSlot(result=str)
     def current_job_id(self):
         data = {
-            "job_id": "checking",
-            "threshold": "40",
+            "job_id": "Product A",
+            "threshold": "45",
             "data": {
                 "jobs": ["Product A", "Product B", "Product C"],
                 "thresholds": [1, 2, 3, 4, 5, 6],

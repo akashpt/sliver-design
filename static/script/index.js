@@ -1,7 +1,3 @@
-// =====================================================
-// FULL FIXED INDEX.JS - Sliver Strip Detection System
-// Fixed: Sidebar now re-enables properly when Stop is clicked
-// =====================================================
 
 // ─── Clock ──────────────────────────────────────────────────────────
 setInterval(() => {
@@ -25,6 +21,36 @@ let currentStream = null;
 
 let defectHistory = [];
 let currentModalIndex = -1;
+
+// ─── Bridge & Initialization ────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", function () {
+  new QWebChannel(qt.webChannelTransport, async function (channel) {
+    bridge = channel.objects.bridge;
+    if (bridge) {
+      showToast("✅ Bridge Connected Successfully", 3000);
+    } else {
+      showToast("⚠️ No Qt Bridge - Using Laptop Webcam", 4000, "warning");
+    }
+
+    // Load dropdowns (jobs + thresholds) from bridge, then restore saved config
+    await loadDropdownData();
+    await populateInputsFromConfig();
+  });
+
+  renderDefectThumbs();
+  resetToInitialState();
+
+  const jobIdInput = document.getElementById("jobIdInput");
+  const thresholdInput = document.getElementById("thresholdInput");
+
+  // Enable OK button check
+  jobIdInput.addEventListener("change", checkCanConfirm);
+  thresholdInput.addEventListener("input", checkCanConfirm);
+
+  // Auto-save to userConfig.json on every change (debounced 500 ms)
+  jobIdInput.addEventListener("change", autoSaveConfig);
+  thresholdInput.addEventListener("input", autoSaveConfig);
+});
 
 
 async function loadDefectImagesFromBridge() {
@@ -53,114 +79,23 @@ async function loadDefectImagesFromBridge() {
     console.error("Failed loading defect images:", err);
   }
 }
+
 document.addEventListener("DOMContentLoaded", () => {
   
   loadDefectImagesFromBridge();
 });
-// ─── User Config Persistence ─────────────────────────────────────────
-// Manages reading and writing userConfig.json via the Qt bridge.
-// Falls back to localStorage when no bridge is present (browser testing).
-//
-// Expected Qt bridge methods (expose these from your Python/C++ backend):
-//   bridge.readUserConfig()           → returns JSON string (or empty string)
-//   bridge.writeUserConfig(jsonStr)   → writes the string to userConfig.json
-//
-// JSON structure:
-//   { "jobId": "102", "threshold": "82", "lastSaved": "ISO-timestamp" }
-// ─────────────────────────────────────────────────────────────────────
+
 
 const USER_CONFIG_KEY = "userConfig"; // localStorage key (fallback)
 const USER_CONFIG_DEFAULTS = { jobId: "", threshold: "" };
 
-/**
- * Read userConfig.json.
- * Priority: Qt bridge → localStorage → built-in defaults.
- * @returns {Promise<{jobId:string, threshold:string}>}
- */
-async function readUserConfig() {
-  // 1. Try Qt bridge
-  if (bridge && typeof bridge.readUserConfig === "function") {
-    try {
-      const raw = await bridge.readUserConfig();
-      if (raw && raw.trim()) {
-        const parsed = JSON.parse(raw);
-        // Guard against empty / malformed data
-        if (parsed && typeof parsed === "object") {
-          return {
-            jobId: String(parsed.jobId ?? ""),
-            threshold: String(parsed.threshold ?? ""),
-          };
-        }
-      }
-    } catch (e) {
-      console.warn("[UserConfig] Bridge read failed, using localStorage:", e);
-    }
-  }
-
-  // 2. Fallback: localStorage
-  try {
-    const raw = localStorage.getItem(USER_CONFIG_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object") {
-        return {
-          jobId: String(parsed.jobId ?? ""),
-          threshold: String(parsed.threshold ?? ""),
-        };
-      }
-    }
-  } catch (e) {
-    console.warn("[UserConfig] localStorage read failed:", e);
-  }
-
-  // 3. First-time launch — return defaults
-  console.info("[UserConfig] No saved config found. Using defaults.");
-  return { ...USER_CONFIG_DEFAULTS };
-}
-
-/**
- * Write values to userConfig.json.
- * Writes to Qt bridge AND localStorage (belt-and-suspenders).
- * @param {string} jobId
- * @param {string} threshold
- */
-async function writeUserConfig(jobId, threshold) {
-  const payload = {
-   
-    jobId: String(jobId ?? ""),
-    threshold: String(threshold ?? ""),
-    lastSaved: new Date().toISOString(),
-  };
-  
-  const jsonStr = JSON.stringify(payload, null, 2);
-
-  // 1. Qt bridge (primary — true file persistence)
-  if (bridge && typeof bridge.writeUserConfig === "function") {
-    try {
-      await bridge.writeUserConfig(jsonStr);
-    } catch (e) {
-      console.warn("[UserConfig] Bridge write failed:", e);
-    }
-  }
-
-  // 2. localStorage (secondary — survives page reloads in browser mode)
-  try {
-    localStorage.setItem(USER_CONFIG_KEY, jsonStr);
-  } catch (e) {
-    console.warn("[UserConfig] localStorage write failed:", e);
-  }
-
-  addLog(
-    `[UserConfig] Saved → jobId="${payload.jobId}", threshold="${payload.threshold}"`,
-  );
-}
 
 /**
  * Populate the two input fields from saved config.
  * Called once on DOMContentLoaded (after bridge is ready).
  */
 async function populateInputsFromConfig() {
-  const cfg = await readUserConfig();
+  // const cfg = await readUserConfig();
 
   const jobInput = document.getElementById("jobIdInput");
   const thresholdInput = document.getElementById("thresholdInput");
@@ -206,11 +141,6 @@ function debounce(fn, delay) {
   };
 }
 
-const autoSaveConfig = debounce(async () => {
-  const jobId = document.getElementById("jobIdInput")?.value ?? "";
-  const threshold = document.getElementById("thresholdInput")?.value ?? "";
-  await writeUserConfig(jobId, threshold);
-}, 500);
 
 // ─── Fetch Job IDs & Thresholds from Bridge ─────────────────────────
 async function loadDropdownData() {
@@ -226,6 +156,7 @@ async function loadDropdownData() {
         const raw = await bridge.current_job_id();
         if (raw) {
           const parsed = JSON.parse(raw);
+          // alert(parsed.data.jobs);
           jobs          = parsed?.data?.jobs       ?? [];
           thresholds    = parsed?.data?.thresholds ?? [];
           presetJobId   = String(parsed?.job_id    ?? "");
@@ -259,13 +190,29 @@ async function loadDropdownData() {
     if (presetJobId) {
       // Select the matching option in the dropdown
       const match = [...jobSelect.options].find((o) => o.value === presetJobId);
-      if (match) {
-        jobSelect.value = presetJobId;
+
+      if (match){
+         jobSelect.value = presetJobId;
       }
-      // Lock the dropdown — value is set by the system
-      jobSelect.disabled = true;
-      jobSelect.style.opacity = "0.6";
-      jobSelect.style.cursor  = "not-allowed";
+      if (presetThreshold){
+        thresholdInput.value    = presetThreshold;
+      }
+      
+      if (match && presetThreshold) {
+       
+        // Lock the dropdown — value is set by the system
+        jobSelect.disabled = true;
+        jobSelect.style.opacity = "0.6";
+        jobSelect.style.cursor  = "not-allowed";
+
+        
+        thresholdInput.disabled = true;
+        thresholdInput.style.opacity = "0.6";
+        thresholdInput.style.cursor  = "not-allowed";
+
+        currentThreshold = presetThreshold;
+      }
+      
 
       // Mirror into currentJobId so confirmConfig works immediately
       currentJobId = presetJobId;
@@ -273,14 +220,7 @@ async function loadDropdownData() {
       if (label) label.textContent = presetJobId;
     }
 
-    if (presetThreshold) {
-      thresholdInput.value    = presetThreshold;
-      thresholdInput.disabled = true;
-      thresholdInput.style.opacity = "0.6";
-      thresholdInput.style.cursor  = "not-allowed";
-
-      currentThreshold = presetThreshold;
-    }
+    
 
     // If both preset values are present, treat config as already confirmed
     if (presetJobId && presetThreshold) {
@@ -300,35 +240,7 @@ async function loadDropdownData() {
   }
 }
 
-// ─── Bridge & Initialization ────────────────────────────────────────
-document.addEventListener("DOMContentLoaded", function () {
-  new QWebChannel(qt.webChannelTransport, async function (channel) {
-    bridge = channel.objects.bridge;
-    if (bridge) {
-      showToast("✅ Bridge Connected Successfully", 3000);
-    } else {
-      showToast("⚠️ No Qt Bridge - Using Laptop Webcam", 4000, "warning");
-    }
 
-    // Load dropdowns (jobs + thresholds) from bridge, then restore saved config
-    await loadDropdownData();
-    await populateInputsFromConfig();
-  });
-
-  renderDefectThumbs();
-  resetToInitialState();
-
-  const jobIdInput = document.getElementById("jobIdInput");
-  const thresholdInput = document.getElementById("thresholdInput");
-
-  // Enable OK button check
-  jobIdInput.addEventListener("change", checkCanConfirm);
-  thresholdInput.addEventListener("input", checkCanConfirm);
-
-  // Auto-save to userConfig.json on every change (debounced 500 ms)
-  jobIdInput.addEventListener("change", autoSaveConfig);
-  thresholdInput.addEventListener("input", autoSaveConfig);
-});
 
 // ─── Side Menu Control ──────────────────────────────────────────────
 function disableSideMenu() {
@@ -404,7 +316,7 @@ function confirmConfig() {
   thresholdInput.style.cursor  = "not-allowed";
 
   // Persist confirmed values immediately (no debounce)
-  writeUserConfig(jobId, threshold);
+  // writeUserConfig(jobId, threshold);
 
   showToast(
     `✅ Configuration Confirmed!<br>Job: ${jobId} | Threshold: ${threshold}`,
@@ -441,7 +353,7 @@ function resetConfig() {
   document.getElementById("okBtn").disabled    = true;
 
   // Persist the cleared state so next launch starts blank
-  writeUserConfig("", "");
+  // writeUserConfig("", "");
 
   showToast("Configuration Reset", 2500);
   addLog("Configuration Reset");
