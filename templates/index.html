@@ -169,16 +169,7 @@
               >
                 <i class="fas fa-chevron-left"></i>
               </button>
-              <img
-                id="defectModalImage"
-                style="
-                  max-width: 100%;
-                  max-height: 68vh;
-                  border-radius: 8px;
-                  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.7);
-                  object-fit: contain;
-                "
-              />
+              <div class="image-viewer"><img id="defectModalImage" /></div>
               <button
                 id="nextDefect"
                 class="defect-nav next"
@@ -189,17 +180,24 @@
             </div>
             <div
               class="modal-foot"
-              style="justify-content: center; padding: 1rem 1.5rem"
+              style="justify-content: space-between; padding: 1rem 1.5rem"
             >
-              <!-- <button class="btn-m primary" onclick="downloadDefectImage()">
-                <i class="fas fa-download"></i> Save Current Image
-              </button> -->
-              <!-- <button class="btn-m delete">
-                <i class="fa-regular fa-trash-can"></i> Delete
-              </button> -->
-              <button class="btn-m ghost" onclick="closeDefectModal()">
-                Close
-              </button>
+              <div>
+                <button id="resetBtn" class="btn-m primary">
+                  <i class="fas fa-rotate-right"></i>
+                </button>
+                <button id="zoomInBtn" class="btn-m primary">
+                  <i class="fas fa-search-plus"></i>
+                </button>
+                <button id="zoomOutBtn" class="btn-m primary">
+                  <i class="fas fa-search-minus"></i>
+                </button>
+              </div>
+              <div>
+                <button class="btn-m ghost close" onclick="closeDefectModal()">
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -492,7 +490,7 @@
         </div>
       </div>
     </div>
-
+    
     <script src="../static/script/index.js"></script>
   </body>
 </html>

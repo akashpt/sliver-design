@@ -1,4 +1,3 @@
-
 // ─── Clock ──────────────────────────────────────────────────────────
 setInterval(() => {
   document.getElementById("clock").textContent = new Date()
@@ -46,27 +45,21 @@ document.addEventListener("DOMContentLoaded", function () {
   // Enable OK button check
   jobIdInput.addEventListener("change", checkCanConfirm);
   thresholdInput.addEventListener("input", checkCanConfirm);
-
 });
-
-
-
 
 // document.addEventListener("DOMContentLoaded", () => {
 //   loadDefectImagesFromBridge();
 // });
 
-
 const USER_CONFIG_KEY = "userConfig"; // localStorage key (fallback)
 const USER_CONFIG_DEFAULTS = { jobId: "", threshold: "" };
-
 
 /**
  * Populate the two input fields from saved config.
  * Called once on DOMContentLoaded (after bridge is ready).
  */
 // async function populateInputsFromConfig() {
-  
+
 //   // const cfg = await readUserConfig();
 
 //   const jobInput = document.getElementById("jobIdInput");
@@ -113,7 +106,6 @@ function debounce(fn, delay) {
   };
 }
 
-
 // ─── Fetch Job IDs & Thresholds from Bridge ─────────────────────────
 async function loadDropdownData() {
   try {
@@ -129,9 +121,9 @@ async function loadDropdownData() {
         if (raw) {
           const parsed = JSON.parse(raw);
           // alert(parsed.data.jobs);
-          jobs          = parsed?.data?.jobs       ?? [];
-          thresholds    = parsed?.data?.thresholds ?? [];
-          presetJobId   = String(parsed?.job_id    ?? "");
+          jobs = parsed?.data?.jobs ?? [];
+          thresholds = parsed?.data?.thresholds ?? [];
+          presetJobId = String(parsed?.job_id ?? "");
           presetThreshold = String(parsed?.threshold ?? "");
         }
       } catch (e) {
@@ -163,28 +155,25 @@ async function loadDropdownData() {
       // Select the matching option in the dropdown
       const match = [...jobSelect.options].find((o) => o.value === presetJobId);
 
-      if (match){
-         jobSelect.value = presetJobId;
+      if (match) {
+        jobSelect.value = presetJobId;
       }
-      if (presetThreshold){
-        thresholdInput.value    = presetThreshold;
+      if (presetThreshold) {
+        thresholdInput.value = presetThreshold;
       }
 
       if (match && presetThreshold) {
-       
         // Lock the dropdown — value is set by the system
         jobSelect.disabled = true;
         jobSelect.style.opacity = "0.6";
-        jobSelect.style.cursor  = "not-allowed";
+        jobSelect.style.cursor = "not-allowed";
 
-        
         thresholdInput.disabled = true;
         thresholdInput.style.opacity = "0.6";
-        thresholdInput.style.cursor  = "not-allowed";
+        thresholdInput.style.cursor = "not-allowed";
 
         currentThreshold = presetThreshold;
       }
-      
 
       // Mirror into currentJobId so confirmConfig works immediately
       currentJobId = presetJobId;
@@ -192,30 +181,27 @@ async function loadDropdownData() {
       if (label) label.textContent = presetJobId;
     }
 
-    
-
     // If both preset values are present, treat config as already confirmed
     if (presetJobId && presetThreshold) {
-      document.getElementById("okBtn").disabled   = true;
+      document.getElementById("okBtn").disabled = true;
       document.getElementById("startBtn").disabled = false;
       showToast(
         `🔒 Auto-configured — Job: ${presetJobId} | Threshold: ${presetThreshold}`,
-        4000
+        4000,
       );
-      addLog(`[Bridge] Auto-config applied → Job: ${presetJobId}, Threshold: ${presetThreshold}`);
+      addLog(
+        `[Bridge] Auto-config applied → Job: ${presetJobId}, Threshold: ${presetThreshold}`,
+      );
     } else {
       checkCanConfirm();
     }
-
   } catch (error) {
     console.error("[Dropdown] loadDropdownData error:", error);
   }
 }
 
-
 async function loadDefectImagesFromBridge() {
   try {
-
     if (!bridge || typeof bridge.get_defect_images !== "function") {
       console.warn("Bridge not available");
       return;
@@ -223,28 +209,25 @@ async function loadDefectImagesFromBridge() {
 
     const raw = await bridge.get_defect_images();
     const parsed = JSON.parse(raw);
-    
+
     const images = parsed?.images || [];
 
-    defectHistory = [];   // 🔥 RESET
+    defectHistory = []; // 🔥 RESET
 
     images.forEach((src) => {
       if (!src) return;
       defectHistory.push({
         time: new Date().toLocaleTimeString(),
-        src: src
+        src: src,
       });
     });
 
     console.log("✅ Defect images loaded:", images.length);
     renderDefectThumbs();
-
   } catch (err) {
     console.error("❌ Failed loading defect images:", err);
   }
 }
-
-
 
 // ─── Side Menu Control ──────────────────────────────────────────────
 function disableSideMenu() {
@@ -309,15 +292,15 @@ function confirmConfig() {
   document.getElementById("jobIdLabel").textContent = jobId;
 
   // Lock both inputs after confirmation
-  const jobSelect      = document.getElementById("jobIdInput");
+  const jobSelect = document.getElementById("jobIdInput");
   const thresholdInput = document.getElementById("thresholdInput");
 
-  jobSelect.disabled          = true;
-  jobSelect.style.opacity     = "0.6";
-  jobSelect.style.cursor      = "not-allowed";
-  thresholdInput.disabled     = true;
+  jobSelect.disabled = true;
+  jobSelect.style.opacity = "0.6";
+  jobSelect.style.cursor = "not-allowed";
+  thresholdInput.disabled = true;
   thresholdInput.style.opacity = "0.6";
-  thresholdInput.style.cursor  = "not-allowed";
+  thresholdInput.style.cursor = "not-allowed";
 
   // Persist confirmed values immediately (no debounce)
   // writeUserConfig(jobId, threshold);
@@ -334,27 +317,27 @@ function confirmConfig() {
 
 // ─── Reset Configuration ────────────────────────────────────────────
 function resetConfig() {
-  const jobSelect     = document.getElementById("jobIdInput");
+  const jobSelect = document.getElementById("jobIdInput");
   const thresholdInput = document.getElementById("thresholdInput");
 
-  jobSelect.value      = "";
+  jobSelect.value = "";
   thresholdInput.value = "";
-  currentJobId         = "";
-  currentThreshold     = "";
+  currentJobId = "";
+  currentThreshold = "";
   document.getElementById("jobIdLabel").textContent = "—";
 
   // Re-enable fields that may have been locked by bridge preset
-  jobSelect.disabled          = false;
-  jobSelect.style.opacity     = "1";
-  jobSelect.style.cursor      = "pointer";
-  thresholdInput.disabled     = false;
+  jobSelect.disabled = false;
+  jobSelect.style.opacity = "1";
+  jobSelect.style.cursor = "pointer";
+  thresholdInput.disabled = false;
   thresholdInput.style.opacity = "1";
-  thresholdInput.style.cursor  = "pointer";
+  thresholdInput.style.cursor = "pointer";
 
   enableSideMenu(); // Re-enable menu on reset
 
   document.getElementById("startBtn").disabled = true;
-  document.getElementById("okBtn").disabled    = true;
+  document.getElementById("okBtn").disabled = true;
 
   // Persist the cleared state so next launch starts blank
   // writeUserConfig("", "");
@@ -515,10 +498,7 @@ function startDetection() {
 
     if (isDefect) {
       bad++;
-      const randomSrc =
-      [
-          Math.floor(Math.random()  )
-        ];
+      const randomSrc = [Math.floor(Math.random())];
 
       defectHistory.unshift({
         time: new Date().toLocaleTimeString([], {
@@ -763,7 +743,7 @@ function addLog(msg) {
 }
 
 // ─── Threshold Suggestions ──────────────────────────────────────────
-const THRESHOLD_SUGGESTIONS = [ ""];
+const THRESHOLD_SUGGESTIONS = [""];
 
 function filterSuggestions() {
   const input = document.getElementById("thresholdInput");
@@ -863,3 +843,33 @@ document.getElementById("settingsModal")?.addEventListener("click", (e) => {
   if (e.target === e.currentTarget) closeSettings();
 });
 
+// defect image zoom
+
+const image = document.getElementById("defectModalImage");
+
+let zoomLevel = 1;
+const zoomStep = 0.2;
+const maxZoom = 5;
+const minZoom = 1;
+
+// ✅ Zoom In
+document.getElementById("zoomInBtn").onclick = () => {
+  if (zoomLevel < maxZoom) {
+    zoomLevel += zoomStep;
+    image.style.transform = `scale(${zoomLevel})`;
+  }
+};
+
+// ✅ Zoom Out
+document.getElementById("zoomOutBtn").onclick = () => {
+  if (zoomLevel > minZoom) {
+    zoomLevel -= zoomStep;
+    image.style.transform = `scale(${zoomLevel})`;
+  }
+};
+
+// ✅ Reset
+document.getElementById("resetBtn").onclick = () => {
+  zoomLevel = 1;
+  image.style.transform = "scale(1)";
+};
