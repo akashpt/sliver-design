@@ -68,7 +68,8 @@ class Bridge(QObject):
 
         self.camera_open = True
         self.timer.start(30)
-
+        return "OK"
+    
     @pyqtSlot()
     def stopCamera(self):
         if not self.camera_open:
