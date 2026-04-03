@@ -34,7 +34,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Load dropdowns (jobs + thresholds) from bridge, then restore saved config
     await loadDropdownData();
-    await populateInputsFromConfig();
+    await loadDefectImagesFromBridge();
   });
 
   renderDefectThumbs();
@@ -47,43 +47,14 @@ document.addEventListener("DOMContentLoaded", function () {
   jobIdInput.addEventListener("change", checkCanConfirm);
   thresholdInput.addEventListener("input", checkCanConfirm);
 
-  // Auto-save to userConfig.json on every change (debounced 500 ms)
-  jobIdInput.addEventListener("change", autoSaveConfig);
-  thresholdInput.addEventListener("input", autoSaveConfig);
 });
 
 
-async function loadDefectImagesFromBridge() {
-  try {
 
-    if (!bridge || typeof bridge.get_defect_images !== "function") {
-      console.warn("Bridge not available");
-      return;
-    }
 
-    const raw = await bridge.get_defect_images();
-    const parsed = JSON.parse(raw);
-
-    const images = parsed?.images || [];
-
-    images.forEach((src) => {
-      defectHistory.push({
-        time: "Sample",
-        src: src  
-      });
-    });
-
-    console.log("Defect images loaded from bridge");
-
-  } catch (err) {
-    console.error("Failed loading defect images:", err);
-  }
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  
-  loadDefectImagesFromBridge();
-});
+// document.addEventListener("DOMContentLoaded", () => {
+//   loadDefectImagesFromBridge();
+// });
 
 
 const USER_CONFIG_KEY = "userConfig"; // localStorage key (fallback)
@@ -94,41 +65,42 @@ const USER_CONFIG_DEFAULTS = { jobId: "", threshold: "" };
  * Populate the two input fields from saved config.
  * Called once on DOMContentLoaded (after bridge is ready).
  */
-async function populateInputsFromConfig() {
-  // const cfg = await readUserConfig();
+// async function populateInputsFromConfig() {
+  
+//   // const cfg = await readUserConfig();
 
-  const jobInput = document.getElementById("jobIdInput");
-  const thresholdInput = document.getElementById("thresholdInput");
+//   const jobInput = document.getElementById("jobIdInput");
+//   const thresholdInput = document.getElementById("thresholdInput");
 
-  if (!jobInput || !thresholdInput) return;
+//   if (!jobInput || !thresholdInput) return;
 
-  // jobIdInput is a <select> — only set if the option exists
-  if (cfg.jobId) {
-    const matchingOption = [...jobInput.options].find(
-      (o) => o.value === cfg.jobId,
-    );
-    if (matchingOption) {
-      jobInput.value = cfg.jobId;
-    } else {
-      // Option not loaded yet (async job list). Store for deferred assignment.
-      jobInput.dataset.pendingValue = cfg.jobId;
-    }
-  }
+//   // jobIdInput is a <select> — only set if the option exists
+//   if (cfg.jobId) {
+//     const matchingOption = [...jobInput.options].find(
+//       (o) => o.value === cfg.jobId,
+//     );
+//     if (matchingOption) {
+//       jobInput.value = cfg.jobId;
+//     } else {
+//       // Option not loaded yet (async job list). Store for deferred assignment.
+//       jobInput.dataset.pendingValue = cfg.jobId;
+//     }
+//   }
 
-  // thresholdInput is a plain text/number input
-  if (cfg.threshold) {
-    thresholdInput.value = cfg.threshold;
-  }
+//   // thresholdInput is a plain text/number input
+//   if (cfg.threshold) {
+//     thresholdInput.value = cfg.threshold;
+//   }
 
-  checkCanConfirm();
+//   checkCanConfirm();
 
-  if (cfg.jobId || cfg.threshold) {
-    showToast(
-      `📂 Config loaded — Job: ${cfg.jobId || "—"} | Threshold: ${cfg.threshold || "—"}`,
-      3000,
-    );
-  }
-}
+//   if (cfg.jobId || cfg.threshold) {
+//     showToast(
+//       `📂 Config loaded — Job: ${cfg.jobId || "—"} | Threshold: ${cfg.threshold || "—"}`,
+//       3000,
+//     );
+//   }
+// }
 
 /**
  * Debounce helper — prevents flooding the bridge on every keystroke.
@@ -197,7 +169,7 @@ async function loadDropdownData() {
       if (presetThreshold){
         thresholdInput.value    = presetThreshold;
       }
-      
+
       if (match && presetThreshold) {
        
         // Lock the dropdown — value is set by the system
@@ -237,6 +209,38 @@ async function loadDropdownData() {
 
   } catch (error) {
     console.error("[Dropdown] loadDropdownData error:", error);
+  }
+}
+
+
+async function loadDefectImagesFromBridge() {
+  try {
+
+    if (!bridge || typeof bridge.get_defect_images !== "function") {
+      console.warn("Bridge not available");
+      return;
+    }
+
+    const raw = await bridge.get_defect_images();
+    const parsed = JSON.parse(raw);
+    
+    const images = parsed?.images || [];
+
+    defectHistory = [];   // 🔥 RESET
+
+    images.forEach((src) => {
+      if (!src) return;
+      defectHistory.push({
+        time: new Date().toLocaleTimeString(),
+        src: src
+      });
+    });
+
+    console.log("✅ Defect images loaded:", images.length);
+    renderDefectThumbs();
+
+  } catch (err) {
+    console.error("❌ Failed loading defect images:", err);
   }
 }
 
@@ -720,18 +724,18 @@ function closeDefectModal() {
   if (modal) modal.style.display = "none";
 }
 
-function downloadDefectImage() {
-  if (currentModalIndex < 0 || currentModalIndex >= defectHistory.length)
-    return;
-  const defect = defectHistory[currentModalIndex];
-  const link = document.createElement("a");
-  link.href = defect.src;
-  link.download = `sliver_defect_${currentModalIndex + 1}_${Date.now()}.jpg`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  showToast("✅ Defect image downloaded", 2500);
-}
+// function downloadDefectImage() {
+//   if (currentModalIndex < 0 || currentModalIndex >= defectHistory.length)
+//     return;
+//   const defect = defectHistory[currentModalIndex];
+//   const link = document.createElement("a");
+//   link.href = defect.src;
+//   link.download = `sliver_defect_${currentModalIndex + 1}_${Date.now()}.jpg`;
+//   document.body.appendChild(link);
+//   link.click();
+//   document.body.removeChild(link);
+//   showToast("✅ Defect image downloaded", 2500);
+// }
 
 // ─── Toast & Log ────────────────────────────────────────────────────
 function showToast(msg, ms = 3500, type = "success") {
