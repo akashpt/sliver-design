@@ -844,32 +844,141 @@ document.getElementById("settingsModal")?.addEventListener("click", (e) => {
 });
 
 // defect image zoom
-
 const image = document.getElementById("defectModalImage");
+const viewer = document.getElementById("imageViewer");
+
+const zoomInBtn = document.getElementById("zoomInBtn");
+const zoomOutBtn = document.getElementById("zoomOutBtn");
+const resetBtn = document.getElementById("resetBtn");
 
 let zoomLevel = 1;
 const zoomStep = 0.2;
 const maxZoom = 5;
 const minZoom = 1;
 
-// ✅ Zoom In
-document.getElementById("zoomInBtn").onclick = () => {
+let posX = 0;
+let posY = 0;
+
+let startX = 0;
+let startY = 0;
+let isDragging = false;
+
+// ===================
+// APPLY TRANSFORM
+// ===================
+function updateTransform() {
+  image.style.transform = `translate3d(${posX}px, ${posY}px, 0) scale(${zoomLevel})`;
+}
+
+// ===================
+// RESET FUNCTION
+// ===================
+function resetView() {
+  zoomLevel = 1;
+  posX = 0;
+  posY = 0;
+  updateTransform();
+}
+
+// ===================
+// ZOOM IN
+// ===================
+zoomInBtn.onclick = () => {
   if (zoomLevel < maxZoom) {
     zoomLevel += zoomStep;
-    image.style.transform = `scale(${zoomLevel})`;
+    updateTransform();
   }
 };
 
-// ✅ Zoom Out
-document.getElementById("zoomOutBtn").onclick = () => {
+// ===================
+// ZOOM OUT
+// ===================
+zoomOutBtn.onclick = () => {
   if (zoomLevel > minZoom) {
     zoomLevel -= zoomStep;
-    image.style.transform = `scale(${zoomLevel})`;
+
+    if (zoomLevel <= 1) {
+      resetView(); // ⭐ FIX
+      return;
+    }
+
+    updateTransform();
   }
 };
 
-// ✅ Reset
-document.getElementById("resetBtn").onclick = () => {
-  zoomLevel = 1;
-  image.style.transform = "scale(1)";
-};
+// ===================
+// RESET BUTTON
+// ===================
+resetBtn.onclick = resetView;
+
+// ===================
+// DRAG START
+// ===================
+viewer.addEventListener("mousedown", (e) => {
+  if (zoomLevel <= 1) return;
+
+  isDragging = true;
+  viewer.classList.add("dragging");
+
+  startX = e.clientX - posX;
+  startY = e.clientY - posY;
+});
+
+// ===================
+// DRAG MOVE
+// ===================
+window.addEventListener("mousemove", (e) => {
+  if (!isDragging) return;
+
+  posX = e.clientX - startX;
+  posY = e.clientY - startY;
+
+  updateTransform();
+});
+
+// ===================
+// DRAG END
+// ===================
+window.addEventListener("mouseup", () => {
+  isDragging = false;
+  viewer.classList.remove("dragging");
+});
+// mouse wheel scrool
+viewer.addEventListener("wheel", (e) => {
+  e.preventDefault();
+
+  const rect = viewer.getBoundingClientRect();
+
+  // mouse position inside viewer
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+
+  const scaleAmount = 0.1;
+
+  let newZoom =
+    e.deltaY < 0
+      ? zoomLevel + scaleAmount // scroll up
+      : zoomLevel - scaleAmount; // scroll down
+
+  // limit zoom
+  newZoom = Math.min(maxZoom, Math.max(minZoom, newZoom));
+
+  // stop if same zoom
+  if (newZoom === zoomLevel) return;
+
+  // 🔥 zoom towards mouse position
+  const zoomRatio = newZoom / zoomLevel;
+
+  posX = mouseX - (mouseX - posX) * zoomRatio;
+  posY = mouseY - (mouseY - posY) * zoomRatio;
+
+  zoomLevel = newZoom;
+
+  // auto reset when normal size
+  if (zoomLevel <= 1) {
+    resetView();
+    return;
+  }
+
+  updateTransform();
+});
