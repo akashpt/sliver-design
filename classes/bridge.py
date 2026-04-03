@@ -6,6 +6,7 @@ from datetime import datetime
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QTimer, QStandardPaths, QDir
 from PyQt5.QtWidgets import QApplication  # Only if needed elsewhere
 from classes.mindvision import MindVisionCamera
+from path import INDEX_PAGE,TRAINING_PAGE
 
 
 class Bridge(QObject):
@@ -216,7 +217,7 @@ class Bridge(QObject):
     # Navigation
     @pyqtSlot()
     def goHome(self):
-        self.app_ref.load_page("index.html")
+        self.app_ref.load_page(INDEX_PAGE)
 
     @pyqtSlot()
     def goReport(self):
@@ -224,4 +225,4 @@ class Bridge(QObject):
 
     @pyqtSlot()
     def goTraining(self):
-        self.app_ref.load_page("training.html")
+        self.app_ref.load_page(TRAINING_PAGE)

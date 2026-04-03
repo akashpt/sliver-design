@@ -6,7 +6,7 @@ from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtCore import QUrl
 
 from classes.bridge import Bridge
-from path import TEMPLATES_DIR
+from path import TEMPLATES_DIR,REPORT_PAGE
 
 
 class MainWindow(QMainWindow):
@@ -60,7 +60,7 @@ class MainWindow(QMainWindow):
         view = QWebEngineView()
         self.report_window.setCentralWidget(view)
 
-        report_file = (TEMPLATES_DIR / "report.html").resolve()
+        report_file = (REPORT_PAGE).resolve()
 
         if report_file.exists():
             view.load(QUrl.fromLocalFile(str(report_file)))
