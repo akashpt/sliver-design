@@ -4,11 +4,8 @@
 //           Camera Control · Bridge Communication · Range Sliders
 // ═══════════════════════════════════════════════════════════════════
 
-
 document.addEventListener("DOMContentLoaded", function () {
-
   new QWebChannel(qt.webChannelTransport, async function (channel) {
-
     window.bridge = channel.objects.bridge;
 
     if (!bridge) {
@@ -20,9 +17,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // ✅ CONNECT FRAME SIGNAL ONLY HERE
     if (bridge.frame_signal) {
-
       bridge.frame_signal.connect(function (frame) {
-
         const img = document.getElementById("bridgeFeed");
         const noFeed = document.getElementById("noFeed");
 
@@ -37,15 +32,10 @@ document.addEventListener("DOMContentLoaded", function () {
       console.log("✅ frame_signal connected");
     }
 
-    // await loadDropdownData();
-    // await populateInputsFromConfig();
-
   });
 
-
-
   renderDefectThumbs();
-  // resetToInitialState(); 
+  // resetToInitialState();
 
   const jobIdInput = document.getElementById("jobIdInput");
   const thresholdInput = document.getElementById("thresholdInput");
@@ -58,8 +48,6 @@ document.addEventListener("DOMContentLoaded", function () {
   jobIdInput.addEventListener("change", autoSaveConfig);
   thresholdInput.addEventListener("input", autoSaveConfig);
 });
- 
-
 
 // ── Module: Clock ───────────────────────────────────────────────────
 (function initClock() {
@@ -237,13 +225,38 @@ const Bridge = (() => {
   //    undefined, so result === "OK" was always false — the bridge path
   //    was silently skipped every time.
   //    Solution: wrap in a Promise and use the callback overload.
+
   function startCamera() {
     return new Promise((resolve) => {
-      if (available() && typeof window.bridge.startCamera === "function") {
+      if (!available() || typeof window.bridge.startCamera !== "function") {
+        showCameraModal("Error", "Camera bridge not available");
+        resolve(false);
+        return;
+      }
+
+      let responded = false;
+
+      try {
         window.bridge.startCamera(function (result) {
-          resolve(result === "OK");
+          responded = true;
+
+          if (result === "OK") {
+            resolve(true);
+          } else {
+            showCameraModal("Camera Error", result);
+            resolve(false);
+          }
         });
-      } else {
+
+        // timeout check
+        setTimeout(() => {
+          if (!responded) {
+            showCameraModal("Timeout", "Camera response not received");
+            resolve(false);
+          }
+        }, 3000);
+      } catch (err) {
+        showCameraModal("Exception", err.message);
         resolve(false);
       }
     });
@@ -409,16 +422,30 @@ const CameraControl = (() => {
   }
 
   // ── Camera stop ─────────────────────────────────────────────────────
-  function stopCamera() {
-    if (usingBridge) {
-      Bridge.stopCamera();
-      usingBridge = false;
-    } else if (currentStream) {
-      currentStream.getTracks().forEach((t) => t.stop());
-      currentStream = null;
-    }
-    hideFeed();
+async function stopCamera() {
+  showLoader("Stopping Camera..."); // ✅ show loader
+
+  try {
+    await new Promise((resolve) => {
+      setTimeout(() => {
+        if (usingBridge) {
+          Bridge.stopCamera();
+          usingBridge = false;
+        } else if (currentStream) {
+          currentStream.getTracks().forEach((t) => t.stop());
+          currentStream = null;
+        }
+
+        hideFeed();
+        resolve();
+      }, 300); // small delay so loader is visible
+    });
+  } catch (err) {
+    console.error("Stop camera error:", err);
+  } finally {
+    hideLoader(); // ✅ hide loader after stop
   }
+}
 
   // ── Live Camera ─────────────────────────────────────────────────────
   async function startLive() {

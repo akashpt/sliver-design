@@ -228,6 +228,30 @@ async function loadDefectImagesFromBridge() {
     console.error("❌ Failed loading defect images:", err);
   }
 }
+// count add ------------------------------------------
+async function loadCountsFromBridge() {
+  try {
+    if (!bridge || typeof bridge.get_counts !== "function") {
+      console.warn("Counts API not available");
+      return;
+    }
+
+    const raw = await bridge.get_counts(currentJobId);
+    const parsed = JSON.parse(raw);
+
+    // ✅ SET GLOBAL VARIABLES
+    inspected = parsed.inspected || 0;
+    good = parsed.good || 0;
+    bad = parsed.defective || 0;
+
+    // ✅ UPDATE UI
+    updateCounters();
+
+    console.log("✅ Counts Loaded", parsed);
+  } catch (err) {
+    console.error("❌ Failed to load counts:", err);
+  }
+}
 
 // ─── Side Menu Control ──────────────────────────────────────────────
 function disableSideMenu() {
@@ -364,6 +388,10 @@ function resetToInitialState() {
   hideCameraFeed();
   document.getElementById("statusLabel").textContent = "STANDBY";
   document.getElementById("jobIdLabel").textContent = "—";
+  inspected = 0;
+  good = 0;
+  bad = 0;
+  updateCounters();
 }
 
 // ─── Camera Helpers ─────────────────────────────────────────────────
@@ -464,6 +492,7 @@ function startDetection() {
   }
 
   showCameraFeed();
+  loadCountsFromBridge(); 
   document.getElementById("statusLabel").textContent = "ACTIVE";
 
   setUIState(true);
@@ -583,7 +612,6 @@ function updateCounters() {
   document.getElementById("inspectedCount").textContent = inspected;
   document.getElementById("goodCount").textContent = good;
   document.getElementById("badCount").textContent = bad;
-  document.getElementById("hdrDefects").textContent = bad;
 }
 
 function startUptime() {

@@ -38,7 +38,7 @@ class Bridge(QObject):
     def startCamera(self):
         if self.camera_open:
             print("⚠️ Camera already running")
-            return
+            return "Camera Already Running"
 
         print("🔥 Starting camera...")
 
@@ -51,6 +51,7 @@ class Bridge(QObject):
                 print("✅ Using MindVision Camera")
             else:
                 raise Exception("MindVision not available")
+                # return "Camera not available"
 
         except Exception as e:
             print("⚠️ MindVision not available:", e)
@@ -58,18 +59,18 @@ class Bridge(QObject):
             self.camera = None
             self.use_mindvision = False
 
-            self.cap = cv2.VideoCapture(0)
+            self.cap = cv2.VideoCapture(1)
 
             if not self.cap.isOpened():
                 print("❌ Webcam not available")
-                return
+                return "Camera not available"
 
             print("✅ Using Webcam")
 
         self.camera_open = True
         self.timer.start(30)
         return "OK"
-    
+
     @pyqtSlot()
     def stopCamera(self):
         if not self.camera_open:
@@ -178,6 +179,30 @@ class Bridge(QObject):
                 "https://picsum.photos/seed/industrialdefect/640/480",
                 "https://placehold.co/640x480/d00000/fff?text=CRACK+DETECTED",
             ]
+        }
+        return json.dumps(data)
+
+    @pyqtSlot(str, result=str)
+    def get_counts(self, job_id):
+        if job_id == "Product A":
+            inspected = 120
+            good = 110
+            defective = 10
+        elif job_id == "Product B":
+            inspected = 90
+            good = 80
+            defective = 10
+        else:
+            # default fallback
+            inspected = 0
+            good = 0
+            defective = 0
+
+        data = {
+            "job_id": job_id,
+            "inspected": inspected,
+            "good": good,
+            "defective": defective,
         }
         return json.dumps(data)
 

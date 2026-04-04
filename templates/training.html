@@ -598,7 +598,54 @@
         </div>
       </div>
     </div>
+    <!-- Camera Status Modal -->
+    <div id="cameraModal" class="camera-modal">
+      <div class="camera-modal-box">
+        <h3 id="cameraModalTitle">Camera Error</h3>
+        <p id="cameraModalMessage">Camera not connected</p>
 
+        <button type="button" onclick="handleCameraModalOk()">OK</button>
+      </div>
+    </div>
+
+    <div id="cameraLoader" style="display: none">
+      <div class="loader-box">
+        <div class="spinner"></div>
+        <p id="loaderText">Stopping Camera...</p>
+      </div>
+    </div>
+    <script>
+      function showCameraModal(title, message) {
+        document.getElementById("cameraModalTitle").textContent = title;
+        document.getElementById("cameraModalMessage").textContent = message;
+
+        document.getElementById("cameraModal").style.display = "flex";
+      }
+
+      function closeCameraModal() {
+        document.getElementById("cameraModal").style.display = "none";
+      }
+
+      function handleCameraModalOk() {
+        console.log("OK clicked");
+        closeCameraModal();
+      }
+
+      //
+
+      function showLoader(msg = "Processing...") {
+        const loader = document.getElementById("cameraLoader");
+        const text = document.getElementById("loaderText");
+
+        if (text) text.textContent = msg;
+        if (loader) loader.style.display = "flex";
+      }
+
+      function hideLoader() {
+        const loader = document.getElementById("cameraLoader");
+        if (loader) loader.style.display = "none";
+      }
+    </script>
     <!-- Script at bottom of body — DOM is fully parsed when it executes -->
     <script src="../static/script/traning.js"></script>
   </body>
