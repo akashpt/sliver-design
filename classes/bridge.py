@@ -5,8 +5,9 @@ import os
 from datetime import datetime
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QTimer, QStandardPaths, QDir
 from PyQt5.QtWidgets import QApplication  # Only if needed elsewhere
-from classes.mindvision import MindVisionCamera
-from path import INDEX_PAGE,TRAINING_PAGE
+
+# from classes.mindvision import MindVisionCamera
+from path import INDEX_PAGE, TRAINING_PAGE
 
 
 class Bridge(QObject):
@@ -17,7 +18,7 @@ class Bridge(QObject):
         super().__init__()
         self.app_ref = app_ref
 
-         # Camera
+        # Camera
         self.camera = None
         self.cap = None
         self.use_mindvision = False
@@ -33,25 +34,28 @@ class Bridge(QObject):
         self.config_path = os.path.join(config_dir, "userConfig.json")
 
     # ====================== CAMERA ======================
-
+    # // start camera--------------------------------
     @pyqtSlot(result=str)
     def startCamera(self):
+
+        # ─── Already Running ─────────────────────────────
         if self.camera_open:
             print("⚠️ Camera already running")
             return "Camera Already Running"
 
         print("🔥 Starting camera...")
 
+        # ─── Try MindVision Camera First ─────────────────
         try:
-            self.camera = MindVisionCamera()
+            # self.camera = MindVisionCamera()
             self.camera.start()
 
             if self.camera.hCamera != 0:
                 self.use_mindvision = True
                 print("✅ Using MindVision Camera")
+
             else:
-                raise Exception("MindVision not available")
-                # return "Camera not available"
+                raise Exception("MindVision handle invalid")
 
         except Exception as e:
             print("⚠️ MindVision not available:", e)
@@ -59,18 +63,24 @@ class Bridge(QObject):
             self.camera = None
             self.use_mindvision = False
 
-            self.cap = cv2.VideoCapture(1)
+            # ─── Fallback → Webcam ───────────────────────
+            self.cap = cv2.VideoCapture(0)
 
             if not self.cap.isOpened():
                 print("❌ Webcam not available")
+                self.camera_open = False
                 return "Camera not available"
 
             print("✅ Using Webcam")
 
+        # ─── Start Frame Timer ───────────────────────────
         self.camera_open = True
         self.timer.start(30)
+
+        print("🎥 Camera Started Successfully")
         return "OK"
 
+    # // stop camera--------------------------------
     @pyqtSlot()
     def stopCamera(self):
         if not self.camera_open:
@@ -170,17 +180,36 @@ class Bridge(QObject):
 
     @pyqtSlot(result=str)
     def get_defect_images(self):
-        data = {
-            "images": [
-                "https://placehold.co/640x480/ff4d6d/white?text=EDGE+SLIVER",
-                "https://placehold.co/640x480/ef233c/fff?text=DENT+DEFECT",
-                "https://picsum.photos/seed/metaldefect1/640/480",
-                "https://placehold.co/640x480/c1121f/white?text=SCRATCH+DEFECT",
-                "https://picsum.photos/seed/industrialdefect/640/480",
-                "https://placehold.co/640x480/d00000/fff?text=CRACK+DETECTED",
-            ]
-        }
-        return json.dumps(data)
+
+        default_images = [
+            "https://picsum.photos/seed/metaldefect1/640/480",
+            "https://placehold.co/640x480/ef233c/fff?text=DENT+DEFECT",
+            "https://picsum.photos/seed/metaldefect1/640/480",
+            "https://placehold.co/640x480/ff4d6d/white?text=EDGE+SLIVER",
+        ]
+
+        # Camera detected images
+        extra_images = [
+            "https://placehold.co/640x480/ff4d6d/white?text=EDGE+SLIVER",
+            "https://placehold.co/640x480/ff4d6d/white?text=EDGE+SLIVER"
+        ]
+
+        images = []
+
+        # ✅ Add all trained images
+        images.extend(default_images)
+
+        # ✅ Compare detected images
+        for img in extra_images:
+
+            # IMAGE NOT MATCHED → DEFECT
+            if img not in default_images:
+                print("🔥 DEFECT IMAGE:", img)
+                images.append(img)
+
+        return json.dumps({"images": images})
+
+
 
     @pyqtSlot(str, result=str)
     def get_counts(self, job_id):

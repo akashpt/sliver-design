@@ -17,8 +17,9 @@ let uptimeTimer = null;
 let demoDefectInterval = null;
 let bridge = null;
 let currentStream = null;
-
+let defectPollingInterval = null;
 let defectHistory = [];
+let defectImageSet = new Set(); // ⭐ ADD THIS LINE
 let currentModalIndex = -1;
 
 // ─── Bridge & Initialization ────────────────────────────────────────
@@ -212,18 +213,26 @@ async function loadDefectImagesFromBridge() {
 
     const images = parsed?.images || [];
 
-    defectHistory = []; // 🔥 RESET
-
     images.forEach((src) => {
-      if (!src) return;
-      defectHistory.push({
-        time: new Date().toLocaleTimeString(),
-        src: src,
-      });
+      if (!src || typeof src !== "string" || src.trim() === "") return;
+
+      // ✅ MATCH CHECK
+      if (!defectImageSet.has(src)) {
+        defectImageSet.add(src);
+
+        defectHistory.unshift({
+          time: new Date().toLocaleTimeString(),
+          src: src,
+        });
+
+        console.log("🔥 DEFECT ADDED:", src);
+
+        bad++; // increase defective counter
+      }
     });
 
-    console.log("✅ Defect images loaded:", images.length);
     renderDefectThumbs();
+    updateCounters();
   } catch (err) {
     console.error("❌ Failed loading defect images:", err);
   }
@@ -491,8 +500,12 @@ function startDetection() {
     return;
   }
 
+  if (!defectPollingInterval) {
+    defectPollingInterval = setInterval(loadDefectImagesFromBridge, 2000);
+  }
+
   showCameraFeed();
-  loadCountsFromBridge(); 
+  loadCountsFromBridge();
   document.getElementById("statusLabel").textContent = "ACTIVE";
 
   setUIState(true);
@@ -521,12 +534,12 @@ function startDetection() {
   }
 
   // Demo defect simulation
+  // Demo defect simulation
   demoDefectInterval = setInterval(() => {
     inspected++;
     const isDefect = Math.random() < 0.3;
 
     if (isDefect) {
-      bad++;
       const randomSrc = [Math.floor(Math.random())];
 
       defectHistory.unshift({
@@ -567,7 +580,10 @@ function stopDetection() {
     clearInterval(demoDefectInterval);
     demoDefectInterval = null;
   }
-
+  if (defectPollingInterval) {
+    clearInterval(defectPollingInterval);
+    defectPollingInterval = null;
+  }
   stopUptime();
   setUIState(false);
 
@@ -674,26 +690,25 @@ function renderDefectThumbs() {
   }
 
   defectHistory.forEach((defect, index) => {
+    // ✅ SKIP INVALID IMAGE FIRST
+    if (!defect.src || typeof defect.src !== "string") {
+      console.warn("Skipping invalid defect:", defect);
+      return;
+    }
+
     const thumbWrapper = document.createElement("div");
     thumbWrapper.className = "defect-thumb";
-    thumbWrapper.style.cssText = `
-      width: 118px; height: 88px; flex-shrink: 0; border-radius: 8px;
-      overflow: hidden; cursor: pointer; border: 2px solid #444;
-      position: relative; box-shadow: 0 3px 10px rgba(0,0,0,0.4);
-      transition: all 0.25s ease;
-    `;
 
     thumbWrapper.innerHTML = `
-      <img src="${defect.src}" style="width:100%;height:100%;object-fit:cover;margin-left:10px;margin-right:10px;display:block;" alt="Defect">
-      <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.85));color:white;font-size:0.78rem;padding:6px 8px 5px;text-align:center;font-weight:500;">
+    <img src="${defect.src}"
+         style="width:100%;height:100%;object-fit:cover;display:block;"
+         alt="Defect">
+    <div class="defect-time">
         ${defect.time || "DEFECT"}
-      </div>
-    `;
+    </div>
+  `;
 
     thumbWrapper.onclick = () => openDefectModal(index);
-    thumbWrapper.onmouseenter = () =>
-      (thumbWrapper.style.borderColor = "#ef233c");
-    thumbWrapper.onmouseleave = () => (thumbWrapper.style.borderColor = "#444");
 
     slider.appendChild(thumbWrapper);
   });
