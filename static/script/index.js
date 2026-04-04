@@ -227,7 +227,7 @@ async function loadDefectImagesFromBridge() {
 
         console.log("🔥 DEFECT ADDED:", src);
 
-        bad++; // increase defective counter
+       
       }
     });
 
