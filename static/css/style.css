@@ -1705,3 +1705,10 @@ input[type="range"] {
 .image-viewer.dragging {
   cursor: grabbing;
 }
+
+.defect-thumb img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}

@@ -534,7 +534,6 @@ function startDetection() {
   }
 
   // Demo defect simulation
-  // Demo defect simulation
   demoDefectInterval = setInterval(() => {
     inspected++;
     const isDefect = Math.random() < 0.3;
@@ -700,12 +699,8 @@ function renderDefectThumbs() {
     thumbWrapper.className = "defect-thumb";
 
     thumbWrapper.innerHTML = `
-    <img src="${defect.src}"
-         style="width:100%;height:100%;object-fit:cover;display:block;"
-         alt="Defect">
-    <div class="defect-time">
-        ${defect.time || "DEFECT"}
-    </div>
+      <img src="${defect.src}" alt="Defect">
+  <div class="defect-time">${defect.time}</div>
   `;
 
     thumbWrapper.onclick = () => openDefectModal(index);
