@@ -13,6 +13,7 @@ from path import INDEX_PAGE, TRAINING_PAGE
 class Bridge(QObject):
 
     frame_signal = pyqtSignal(str)
+    sliver_data =  pyqtSignal(json)
 
     def __init__(self, app_ref):
         super().__init__()
@@ -27,6 +28,9 @@ class Bridge(QObject):
         # Frame timer
         self.timer = QTimer()
         self.timer.timeout.connect(self.grab_frame)
+
+        self.data_time = QTimer()
+        self.data_time.timeout.connect(self.sliver_datas)
 
         # Config file path
         config_dir = QStandardPaths.writableLocation(QStandardPaths.AppConfigLocation)
@@ -105,6 +109,7 @@ class Bridge(QObject):
         # ─── Start Frame Timer ───────────────────────────
         self.camera_open = True
         self.timer.start(30)
+        self.data_time.start(500)
 
         print("🎥 Camera Started Successfully")
         return "OK"
@@ -119,6 +124,7 @@ class Bridge(QObject):
         print("🛑 Stopping camera...")
 
         self.timer.stop()
+        self.data_time.stop()
 
         if self.use_mindvision and self.camera:
             try:
@@ -136,6 +142,26 @@ class Bridge(QObject):
 
         self.camera_open = False
         print("✅ Camera fully stopped")
+
+    def sliver_datas(self):
+        try:
+            data = {
+                "total_count":10,
+                "inspect":5,
+                "defect":5,
+                "defect_image":[
+                    "https://picsum.photos/seed/metaldefect1/640/480",
+                    "https://placehold.co/640x480/ef233c/fff?text=DENT+DEFECT",
+                    "https://picsum.photos/seed/metaldefect1/640/480",
+                    "https://placehold.co/640x480/ff4d6d/white?text=EDGE+SLIVER",
+                ]
+            }
+
+            self.sliver_data.emit(json.dumps(data))
+
+            
+        except Exception as e:
+            print(e)
 
     def grab_frame(self):
         try:

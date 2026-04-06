@@ -532,31 +532,31 @@ function startDetection() {
     startLaptopWebcam();
   }
 
-  // Demo defect simulation
-  demoDefectInterval = setInterval(() => {
-    inspected++;
-    const isDefect = Math.random() < 0.3;
+  // // Demo defect simulation
+  // demoDefectInterval = setInterval(() => {
+  //   inspected++;
+  //   const isDefect = Math.random() < 0.3;
 
-    if (isDefect) {
-      const randomSrc = [Math.floor(Math.random())];
+  //   if (isDefect) {
+  //     const randomSrc = [Math.floor(Math.random())];
 
-      defectHistory.unshift({
-        time: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        src: randomSrc,
-      });
+  //     defectHistory.unshift({
+  //       time: new Date().toLocaleTimeString([], {
+  //         hour: "2-digit",
+  //         minute: "2-digit",
+  //       }),
+  //       src: randomSrc,
+  //     });
 
-      if (defectHistory.length > 10) defectHistory.pop();
+  //     if (defectHistory.length > 10) defectHistory.pop();
 
-      addLog('<span style="color:#ef233c">⚠️ DEFECT DETECTED</span>');
-      renderDefectThumbs();
-    } else {
-      good++;
-    }
-    updateCounters();
-  }, 5000);
+  //     addLog('<span style="color:#ef233c">⚠️ DEFECT DETECTED</span>');
+  //     renderDefectThumbs();
+  //   } else {
+  //     good++;
+  //   }
+  //   updateCounters();
+  // }, 5000);
 }
 
 // ─── Stop Detection ─────────────────────────────────────────────────
