@@ -33,7 +33,35 @@ class Bridge(QObject):
         self.config_path = os.path.join(config_dir, "userConfig.json")
 
     # ====================== CAMERA ======================
+    # ====================== SAVE USER CONFIG ======================
 
+    @pyqtSlot(str, str, result=str)
+    def saveUserConfig(self, job_id, threshold):
+        try:
+            data = {
+                "jobId": job_id,
+                "threshold": threshold,
+                "lastSaved": datetime.now().isoformat(),
+            }
+
+            with open(self.config_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+
+            print("✅ Process Confirmed")
+            print("Job:", job_id)
+            print("Threshold:", threshold)
+
+            return json.dumps({
+                "status": "success",
+                "message": "Process Confirmed",
+                "data": data
+            })
+
+        except Exception as e:
+            return json.dumps({
+                "status": "error",
+                "message": str(e)
+            })
     @pyqtSlot(result=str)
     def startCamera(self):
         if self.camera_open:
@@ -206,17 +234,7 @@ class Bridge(QObject):
         }
         return json.dumps(data)
 
-    @pyqtSlot(str)
-    def saveUserConfig(self, json_string):
-        try:
-            data = json.loads(json_string)
-            if "lastSaved" not in data:
-                data["lastSaved"] = datetime.now().isoformat()
-            with open(self.config_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-            print(f"💾 Saved userConfig.json")
-        except Exception as e:
-            print(f"❌ Failed to save userConfig.json: {e}")
+ 
 
     @pyqtSlot(str)
     def saveTrainingSession(self, json_str: str):

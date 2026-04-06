@@ -313,6 +313,7 @@ function confirmConfig() {
 
   currentJobId = jobId;
   currentThreshold = threshold;
+  saveUserConfigToBridge(jobId, threshold);
   document.getElementById("jobIdLabel").textContent = jobId;
 
   // Lock both inputs after confirmation
@@ -1010,3 +1011,31 @@ viewer.addEventListener("wheel", (e) => {
 
   updateTransform();
 });
+
+
+function saveUserConfigToBridge(jobId, threshold) {
+  if (!bridge || typeof bridge.saveUserConfig !== "function") {
+    console.warn("Bridge saveUserConfig not available");
+    return;
+  }
+
+  bridge.saveUserConfig(jobId, threshold, function (response) {
+
+    const result = JSON.parse(response);
+
+    if (result.status === "success") {
+
+      console.log("🟢 PROCESS CONFIRMED");
+      console.log("Job:", result.data.jobId);
+      console.log("Threshold:", result.data.threshold);
+
+      showToast("✅ Process Confirmed", 3000);
+
+      addLog("PROCESS CONFIRMED ✅");
+
+    } else {
+      console.error("❌ Save Failed:", result.message);
+      showToast("❌ Save failed", 3000, "error");
+    }
+  });
+}
