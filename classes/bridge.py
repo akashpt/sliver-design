@@ -13,7 +13,7 @@ from path import INDEX_PAGE, TRAINING_PAGE
 class Bridge(QObject):
 
     frame_signal = pyqtSignal(str)
-    sliver_data =  pyqtSignal(json)
+    sliver_data =  pyqtSignal(str)
 
     def __init__(self, app_ref):
         super().__init__()

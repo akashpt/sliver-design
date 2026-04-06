@@ -35,14 +35,6 @@ def run_path() -> Path:
 APP_DIR = app_path()
 
 
-# STATIC FILES
-STATIC_DIR = APP_DIR / "static"
-CSS_DIR = STATIC_DIR / "css"
-JS_DIR = STATIC_DIR / "script"
-IMG_DIR = STATIC_DIR / "img"
-FONTS_DIR = STATIC_DIR / "fonts"
-WEBFONTS_DIR = STATIC_DIR / "webfonts"
-
 # TEMPLATES
 TEMPLATES_DIR = APP_DIR / "templates"
 
