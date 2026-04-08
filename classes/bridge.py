@@ -5,8 +5,8 @@ import os
 from datetime import datetime
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QTimer, QStandardPaths, QDir
 from PyQt5.QtWidgets import QApplication  # Only if needed elsewhere
-from classes.mindvision import MindVisionCamera
-from path import INDEX_PAGE,TRAINING_PAGE
+# from classes.mindvision import MindVisionCamera
+from path import INDEX_PAGE,TRAINING_PAGE,SETTINGS_FILE, TRAINING_SETTINGS_FILE
 
 
 class Bridge(QObject):
@@ -27,11 +27,6 @@ class Bridge(QObject):
         self.timer = QTimer()
         self.timer.timeout.connect(self.grab_frame)
 
-        # Config file path
-        config_dir = QStandardPaths.writableLocation(QStandardPaths.AppConfigLocation)
-        QDir().mkpath(config_dir)
-        self.config_path = os.path.join(config_dir, "userConfig.json")
-
     # ====================== CAMERA ======================
     # ====================== SAVE USER CONFIG ======================
 
@@ -44,7 +39,7 @@ class Bridge(QObject):
                 "lastSaved": datetime.now().isoformat(),
             }
 
-            with open(self.config_path, "w", encoding="utf-8") as f:
+            with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
 
             print("✅ Process Confirmed")
@@ -62,6 +57,8 @@ class Bridge(QObject):
                 "status": "error",
                 "message": str(e)
             })
+        
+
     @pyqtSlot(result=str)
     def startCamera(self):
         if self.camera_open:
@@ -183,12 +180,28 @@ class Bridge(QObject):
             print("❌ frame error:", e)
 
     # ====================== OTHER METHODS ======================
+    def load_settings(self):
+        try:
+            if SETTINGS_FILE.exists():
+                with open(SETTINGS_FILE, "r") as f:
+                    data = json.load(f)
 
-    @pyqtSlot(result=str)
+                print("✅ Settings loaded:", data)
+                return data
+            else:
+                print("⚠️ settings.json not found")
+                return None
+
+        except Exception as e:
+            print("❌ Error loading settings:", e)
+            return None
+
+    @pyqtSlot(result=str) 
     def current_job_id(self):
+        settings = self.load_settings()
         data = {
-            "job_id": "Product A",
-            "threshold": "45",
+            "job_id": settings.get("jobId",""),
+            "threshold": settings.get("threshold",""),
             "data": {
                 "jobs": ["Product A", "Product B", "Product C"],
                 "thresholds": [1, 2, 3, 4, 5, 6],
@@ -248,10 +261,8 @@ class Bridge(QObject):
                 "savedAt": datetime.now().isoformat(timespec="seconds"),
             }
 
-            session_path = os.path.join(
-                os.path.dirname(self.config_path), "trainingSession.json"
-            )
-            with open(session_path, "w", encoding="utf-8") as f:
+           
+            with open(TRAINING_SETTINGS_FILE, "w", encoding="utf-8") as f:
                 json.dump(record, f, indent=2)
 
             print(f"✅ Training session saved: {record['jobId']}")

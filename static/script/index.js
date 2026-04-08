@@ -350,7 +350,7 @@ function resetConfig() {
   currentJobId = "";
   currentThreshold = "";
   document.getElementById("jobIdLabel").textContent = "—";
-
+  saveUserConfigToBridge(currentJobId, currentThreshold);
   // Re-enable fields that may have been locked by bridge preset
   jobSelect.disabled = false;
   jobSelect.style.opacity = "1";
