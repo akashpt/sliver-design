@@ -1,5 +1,11 @@
 {
-  "jobId": "Product C",
-  "threshold": "5",
-  "lastSaved": "2026-04-08T17:56:19.560160"
+  "jobId": "",
+  "threshold": "",
+  "lastSaved": "2026-04-09T00:20:48.649657",
+  "counts": {
+    "inspected": 0,
+    "good": 0,
+    "defective": 0,
+    "lastUpdated": "2026-04-09T00:20:48.649657"
+  }
 }

@@ -12,7 +12,6 @@ from path import INDEX_PAGE,TRAINING_PAGE,SETTINGS_FILE, TRAINING_SETTINGS_FILE
 class Bridge(QObject):
 
     frame_signal = pyqtSignal(str)
-
     def __init__(self, app_ref):
         super().__init__()
         self.app_ref = app_ref
@@ -33,10 +32,30 @@ class Bridge(QObject):
     @pyqtSlot(str, str, result=str)
     def saveUserConfig(self, job_id, threshold):
         try:
+            settings = {}
+            if SETTINGS_FILE.exists():
+                with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                    settings = json.load(f)
+
+            if job_id == "":  
+                counts = {
+                    "inspected": 0,
+                    "good": 0,
+                    "defective": 0,
+                    "lastUpdated": datetime.now().isoformat()
+                }
+            else:
+                counts = settings.get("counts", {
+                    "inspected": 0,
+                    "good": 0,
+                    "defective": 0
+                })
+
             data = {
                 "jobId": job_id,
                 "threshold": threshold,
                 "lastSaved": datetime.now().isoformat(),
+                "counts": counts  
             }
 
             with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
@@ -45,6 +64,7 @@ class Bridge(QObject):
             print("✅ Process Confirmed")
             print("Job:", job_id)
             print("Threshold:", threshold)
+            print("Counts:", counts)
 
             return json.dumps({
                 "status": "success",
@@ -57,7 +77,6 @@ class Bridge(QObject):
                 "status": "error",
                 "message": str(e)
             })
-        
 
     @pyqtSlot(result=str)
     def startCamera(self):
@@ -202,6 +221,7 @@ class Bridge(QObject):
         data = {
             "job_id": settings.get("jobId",""),
             "threshold": settings.get("threshold",""),
+            "counts": settings.get("counts", {}),
             "data": {
                 "jobs": ["Product A", "Product B", "Product C"],
                 "thresholds": [1, 2, 3, 4, 5, 6],
@@ -234,20 +254,37 @@ class Bridge(QObject):
             good = 80
             defective = 10
         else:
-            # default fallback
             inspected = 0
             good = 0
             defective = 0
 
-        data = {
-            "job_id": job_id,
+        counts_data = {
             "inspected": inspected,
             "good": good,
             "defective": defective,
+            "lastUpdated": datetime.now().isoformat()
         }
-        return json.dumps(data)
 
- 
+        try:
+    
+            settings = {}
+            if SETTINGS_FILE.exists():
+                with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                    settings = json.load(f)
+
+            settings["counts"] = counts_data
+            settings["jobId"] = job_id
+            with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+                json.dump(settings, f, indent=2)
+
+            print("✅ Counts updated in settings.json")
+        except Exception as e:
+            print("❌ Error saving counts:", e)
+
+        return json.dumps({
+            "job_id": job_id,
+            **counts_data
+        })
 
     @pyqtSlot(str)
     def saveTrainingSession(self, json_str: str):
