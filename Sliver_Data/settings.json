@@ -1,11 +1,75 @@
 {
-  "jobId": "",
-  "threshold": "",
-  "lastSaved": "2026-04-09T00:20:48.649657",
-  "counts": {
-    "inspected": 0,
-    "good": 0,
-    "defective": 0,
-    "lastUpdated": "2026-04-09T00:20:48.649657"
-  }
+  "Product A": {
+    "jobId": "Product A",
+    "threshold": "4",
+    "counts": {
+      "inspected": 1027,
+      "good": 726,
+      "defective": 301,
+      "lastUpdated": "2026-04-11T10:11:29.024357"
+    }
+  },
+  "": {
+    "jobId": "",
+    "threshold": "",
+    "counts": {
+      "inspected": 6,
+      "good": 5,
+      "defective": 1,
+      "lastUpdated": "2026-04-09T18:25:19.073060"
+    }
+  },
+  "Product B": {
+    "jobId": "Product B",
+    "threshold": "5",
+    "counts": {
+      "inspected": 273,
+      "good": 185,
+      "defective": 88,
+      "lastUpdated": "2026-04-11T10:08:24.544871"
+    }
+  },
+  "Product C": {
+    "jobId": "Product C",
+    "threshold": "4",
+    "counts": {
+      "inspected": 262,
+      "good": 181,
+      "defective": 81,
+      "lastUpdated": "2026-04-11T10:12:03.611463"
+    }
+  },
+  "_last_job": "Product A",
+  "products": [
+    {
+      "jobId": "Product A",
+      "threshold": "1",
+      "counts": {
+        "inspected": 0,
+        "good": 0,
+        "defective": 0,
+        "lastUpdated": "2026-04-09T15:30:16.901434"
+      }
+    },
+    {
+      "jobId": "",
+      "threshold": "",
+      "counts": {
+        "inspected": 0,
+        "good": 0,
+        "defective": 0,
+        "lastUpdated": "2026-04-09T15:30:53.172174"
+      }
+    },
+    {
+      "jobId": "Product B",
+      "threshold": "2",
+      "counts": {
+        "inspected": 0,
+        "good": 0,
+        "defective": 0,
+        "lastUpdated": "2026-04-09T15:30:58.677086"
+      }
+    }
+  ]
 }
