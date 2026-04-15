@@ -27,6 +27,19 @@ document.addEventListener("DOMContentLoaded", function () {
     bridge = channel.objects.bridge;
     if (bridge) {
       showToast("✅ Bridge Connected Successfully", 3000);
+      if (bridge) {
+      showToast("✅ Bridge Connected Successfully", 3000);
+
+      // 🔥 ADD THIS HERE
+      bridge.counts_signal.connect((data) => {
+        const parsed = JSON.parse(data);
+
+        inspected = parsed.inspected;
+        good = parsed.good;
+        bad = parsed.bad;
+
+        updateCounters();
+      });}
     } else {
       showToast("⚠️ No Qt Bridge - Using Laptop Webcam", 4000, "warning");
     }
@@ -342,6 +355,8 @@ function confirmConfig() {
 
 // ─── Reset Configuration ────────────────────────────────────────────
 function resetConfig() {
+  bridge.resetUserConfig();
+
   const jobSelect = document.getElementById("jobIdInput");
   const thresholdInput = document.getElementById("thresholdInput");
 
@@ -366,7 +381,7 @@ function resetConfig() {
 
   // Persist the cleared state so next launch starts blank
   // writeUserConfig("", "");
-
+  
   showToast("Configuration Reset", 2500);
   addLog("Configuration Reset");
 }
@@ -521,32 +536,32 @@ function startDetection() {
     startLaptopWebcam();
   }
 
-  // Demo defect simulation
-  demoDefectInterval = setInterval(() => {
-    inspected++;
-    const isDefect = Math.random() < 0.3;
+  // // Demo defect simulation
+  // demoDefectInterval = setInterval(() => {
+  //   inspected++;
+  //   const isDefect = Math.random() < 0.3;
 
-    if (isDefect) {
-      bad++;
-      const randomSrc = [Math.floor(Math.random())];
+  //   if (isDefect) {
+  //     bad++;
+  //     const randomSrc = [Math.floor(Math.random())];
 
-      defectHistory.unshift({
-        time: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        src: randomSrc,
-      });
+  //     defectHistory.unshift({
+  //       time: new Date().toLocaleTimeString([], {
+  //         hour: "2-digit",
+  //         minute: "2-digit",
+  //       }),
+  //       src: randomSrc,
+  //     });
 
-      if (defectHistory.length > 10) defectHistory.pop();
+  //     if (defectHistory.length > 10) defectHistory.pop();
 
-      addLog('<span style="color:#ef233c">⚠️ DEFECT DETECTED</span>');
-      renderDefectThumbs();
-    } else {
-      good++;
-    }
-    updateCounters();
-  }, 5000);
+  //     addLog('<span style="color:#ef233c">⚠️ DEFECT DETECTED</span>');
+  //     renderDefectThumbs();
+  //   } else {
+  //     good++;
+  //   }
+  //   updateCounters();
+  // }, 5000);
 }
 
 // ─── Stop Detection ─────────────────────────────────────────────────
@@ -564,10 +579,10 @@ function stopDetection() {
     }
   }
 
-  if (demoDefectInterval) {
-    clearInterval(demoDefectInterval);
-    demoDefectInterval = null;
-  }
+  // if (demoDefectInterval) {
+  //   clearInterval(demoDefectInterval);
+  //   demoDefectInterval = null;
+  // }
 
   stopUptime();
   setUIState(false);
@@ -599,7 +614,7 @@ function setUIState(running) {
     okBtn.disabled = true;
     resetBtn.disabled = true;
   } else {
-    startBtn.disabled = false; // ← Fixed: Allow starting again
+    startBtn.disabled = false; // ← Fixed: Allow starting again 
     stopBtn.disabled = true;
     jobSelect.disabled = true;
     thresholdInput.disabled = true;
@@ -610,9 +625,9 @@ function setUIState(running) {
 
 // ─── Counters & Uptime ──────────────────────────────────────────────
 function updateCounters() {
-  document.getElementById("inspectedCount").textContent = inspected;
-  document.getElementById("goodCount").textContent = good;
-  document.getElementById("badCount").textContent = bad;
+  document.getElementById("inspectedCount").textContent = inspected ?? 0;
+  document.getElementById("goodCount").textContent = good ?? 0;
+  document.getElementById("badCount").textContent = bad ?? 0;
 }
 
 function startUptime() {
@@ -1024,7 +1039,8 @@ function saveUserConfigToBridge(jobId, threshold) {
     const result = JSON.parse(response);
 
     if (result.status === "success") {
-
+      
+      console.log("🔥 Calling saveUserConfig", jobId, threshold);
       console.log("🟢 PROCESS CONFIRMED");
       console.log("Job:", result.data.jobId);
       console.log("Threshold:", result.data.threshold);
