@@ -2,24 +2,30 @@ import cv2
 import base64
 import json
 import os
+import sqlite3
+import random
 from datetime import datetime
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QTimer, QStandardPaths, QDir
 from PyQt5.QtWidgets import QApplication  # Only if needed elsewhere
-
-# from classes.mindvision import MindVisionCamera
-from path import INDEX_PAGE, TRAINING_PAGE
+from classes.mindvision import MindVisionCamera
+from path import *
 
 
 class Bridge(QObject):
 
     frame_signal = pyqtSignal(str)
-    sliver_data =  pyqtSignal(str)
+    counts_signal = pyqtSignal(str)
 
     def __init__(self, app_ref):
         super().__init__()
         self.app_ref = app_ref
 
-        # Camera
+        #database
+        self.db_path = str(DB_FILE)   # set DB path
+        self.init_db()    
+        print("DB Path:", self.db_path)            # create table automatically
+
+         # Camera
         self.camera = None
         self.cap = None
         self.use_mindvision = False
@@ -29,66 +35,102 @@ class Bridge(QObject):
         self.timer = QTimer()
         self.timer.timeout.connect(self.grab_frame)
 
-        self.data_time = QTimer()
-        self.data_time.timeout.connect(self.sliver_datas)
+        self.inspected = 0
+        self.good = 0
+        self.bad = 0
 
         # Config file path
-        config_dir = QStandardPaths.writableLocation(QStandardPaths.AppConfigLocation)
-        QDir().mkpath(config_dir)
-        self.config_path = os.path.join(config_dir, "userConfig.json")
+        # config_dir = QStandardPaths.writableLocation(QStandardPaths.AppConfigLocation)
+        # QDir().mkpath(config_dir)
+        # self.config_path = os.path.join(config_dir, "userConfig.json")        
+        self.config_path= str(USER_CONFIG_FILE)
+
 
     # ====================== CAMERA ======================
+    # ====================== SAVE USER CONFIG ======================
+
     @pyqtSlot(str, str, result=str)
     def saveUserConfig(self, job_id, threshold):
+        # print("🔥 saveUserConfig CALLED") 
         try:
             data = {
-                "jobId": job_id,
+                "job_id": job_id,
                 "threshold": threshold,
                 "lastSaved": datetime.now().isoformat(),
             }
 
             with open(self.config_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
+                json.dump(data, f, indent=2)  #w py dict into json
 
             print("✅ Process Confirmed")
             print("Job:", job_id)
             print("Threshold:", threshold)
+           
 
             return json.dumps({
                 "status": "success",
                 "message": "Process Confirmed",
                 "data": data
-            })
+            }) #con py dict to json str
+        
+        
 
         except Exception as e:
             return json.dumps({
                 "status": "error",
                 "message": str(e)
             })
+        
+    def get_job_from_config(self):
+        try:
+            if os.path.exists(self.config_path):
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f) # json r con to py dict
+
+                return config.get("job_id", ""), config.get("threshold", "")
+        except Exception as e:
+            print("❌ Error reading config:", e)
+
+        return "", ""
     
+    @pyqtSlot()
+    def resetUserConfig(self):
+        try:
+            empty_config = {
+                "job_id": "",
+                "threshold": "",
+                "lastSaved": datetime.now().isoformat()
+            }
+
+            with open(self.config_path, "w", encoding="utf-8") as f:
+                json.dump(empty_config, f, indent=2)
+
+            print("Config reset successfully")
+
+        except Exception as e:
+            print("Reset config error:", e)
+
     
-    # // start camera--------------------------------
+        
+   
     @pyqtSlot(result=str)
     def startCamera(self):
-
-        # ─── Already Running ─────────────────────────────
         if self.camera_open:
             print("⚠️ Camera already running")
             return "Camera Already Running"
 
         print("🔥 Starting camera...")
 
-        # ─── Try MindVision Camera First ─────────────────
         try:
-            # self.camera = MindVisionCamera()
+            self.camera = MindVisionCamera()
             self.camera.start()
 
             if self.camera.hCamera != 0:
                 self.use_mindvision = True
                 print("✅ Using MindVision Camera")
-
             else:
-                raise Exception("MindVision handle invalid")
+                raise Exception("MindVision not available")
+                # return "Camera not available"
 
         except Exception as e:
             print("⚠️ MindVision not available:", e)
@@ -96,25 +138,18 @@ class Bridge(QObject):
             self.camera = None
             self.use_mindvision = False
 
-            # ─── Fallback → Webcam ───────────────────────
             self.cap = cv2.VideoCapture(0)
 
             if not self.cap.isOpened():
                 print("❌ Webcam not available")
-                self.camera_open = False
                 return "Camera not available"
 
             print("✅ Using Webcam")
 
-        # ─── Start Frame Timer ───────────────────────────
         self.camera_open = True
-        self.timer.start(30)
-        self.data_time.start(500)
-
-        print("🎥 Camera Started Successfully")
+        self.timer.start(3000)
         return "OK"
 
-    # // stop camera--------------------------------
     @pyqtSlot()
     def stopCamera(self):
         if not self.camera_open:
@@ -124,7 +159,6 @@ class Bridge(QObject):
         print("🛑 Stopping camera...")
 
         self.timer.stop()
-        self.data_time.stop()
 
         if self.use_mindvision and self.camera:
             try:
@@ -142,26 +176,7 @@ class Bridge(QObject):
 
         self.camera_open = False
         print("✅ Camera fully stopped")
-
-    def sliver_datas(self):
-        try:
-            data = {
-                "total_count":10,
-                "inspect":5,
-                "defect":5,
-                "defect_image":[
-                    "https://picsum.photos/seed/metaldefect1/640/480",
-                    "https://placehold.co/640x480/ef233c/fff?text=DENT+DEFECT",
-                    "https://picsum.photos/seed/metaldefect1/640/480",
-                    "https://placehold.co/640x480/ff4d6d/white?text=EDGE+SLIVER",
-                ]
-            }
-
-            self.sliver_data.emit(json.dumps(data))
-
-            
-        except Exception as e:
-            print(e)
+        self.insert_report()
 
     def grab_frame(self):
         try:
@@ -201,6 +216,18 @@ class Bridge(QObject):
             # SAVE CURRENT FRAME
             # =========================
             self.current_frame = frame.copy()
+            # =========================
+            # RUN DETECTION PER FRAME
+            # =========================
+            status = self.run_detection(frame)
+            counts_data = {
+                "inspected": self.inspected,
+                "good": self.good,
+                "bad": self.bad,
+                "status": status
+            }
+
+            self.counts_signal.emit(json.dumps(counts_data))
 
             # =========================
             # SEND TO UI
@@ -219,63 +246,180 @@ class Bridge(QObject):
         except Exception as e:
             print("❌ frame error:", e)
 
+
+    def run_detection(self, frame):
+         # Every frame is inspected
+        self.inspected += 1
+
+        is_defect = random.random() < 0.3
+
+        if is_defect:
+            self.bad += 1
+            status = "bad"
+        else:
+            self.good += 1
+            status = "good"
+
+        return status
+
     # ====================== OTHER METHODS ======================
 
+    # @pyqtSlot(result=str)
+    # def current_job_id(self):
+    #     data = {
+    #         "job_id": "Product A",
+    #         "threshold": "45",
+    #         "data": {
+    #             "jobs": ["Product A", "Product B", "Product C"],
+    #             "thresholds": [1, 2, 3, 4, 5, 6],
+    #         },
+    #     }
+    #     return json.dumps(data)
     @pyqtSlot(result=str)
     def current_job_id(self):
-        data = {
-            "job_id": "Product A",
-            "threshold": "45",
-            "data": {
-                "jobs": ["Product A", "Product B", "Product C"],
-                "thresholds": [1, 2, 3, 4, 5, 6],
-            },
-        }
-        return json.dumps(data)
+        default_job = "Product A"
+        default_threshold = "45"
+
+        try:
+            job_id = default_job
+            threshold = default_threshold
+
+            if os.path.exists(self.config_path):
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+
+                # ✅ Override only if present in JSON
+                job_id = config.get("job_id", default_job)
+                threshold = config.get("threshold", default_threshold)
+
+            data = {
+                "job_id": job_id,
+                "threshold": threshold,
+                "data": {
+                    "jobs": ["Product A", "Product B", "Product C"],
+                    "thresholds": [1, 2, 3, 4, 5, 6],
+                },
+            }
+
+            return json.dumps(data)
+
+        except Exception as e:
+            print("Error loading config:", e)
+
+            data = {
+                "job_id": default_job,
+                "threshold": default_threshold,
+                "data": {
+                    "jobs": ["Product A", "Product B", "Product C"],
+                    "thresholds": [1, 2, 3, 4, 5, 6],
+                },
+            }
+
+            return json.dumps(data)
+        
+    def init_db(self):
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS REPORT (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                shift_id INTEGER,
+                machine_no TEXT NOT NULL,
+                job_id TEXT NOT NULL,
+                result TEXT NOT NULL,
+                total_strips INTEGER,
+                bad_strips INTEGER,
+                bad_strip_number TEXT,
+                bad_image_path TEXT,
+                created_time TEXT,
+                updated_time TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (shift_id) REFERENCES SHIFT(id)
+            )
+            """)
+
+            conn.commit()
+            conn.close()
+
+            print("✅ Database + Tables initialized")
+
+        except Exception as e:
+            print("❌ DB Init Error:", e)
+            #Creates jobs.db if not exists
+            # Creates jobs table if not exists
+            # Safe to run every time app starts ✅
+
+    def insert_report(self):
+        print("🚀 insert_report called")
+        try:
+            job_id, threshold = self.get_job_from_config()
+            print("Fetched from config → Job ID:", job_id, "| Threshold:", threshold)
+
+            if not job_id:
+                print("⚠️ No job_id found in config")
+                return
+
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                INSERT INTO REPORT (
+                    shift_id,
+                    machine_no,
+                    job_id,
+                    result,
+                    total_strips,
+                    bad_strips,
+                    bad_strip_number,
+                    bad_image_path,
+                    created_time
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                1,                          # shift_id (dummy for now)
+                "M1",                       # machine_no
+                job_id,                     # ✅ from JSON
+                "GOOD",                     # result
+                8,                          # total_strips
+                1,                          # bad_strips
+                "2,5,10",                   # bad_strip_number
+                "path/to/image.jpg",        # bad_image_path
+                datetime.now().isoformat()  # created_time
+            ))
+
+            conn.commit()
+            conn.close()
+            print("🚀 insert_report called")
+            print(f"✅ Inserted job_id '{job_id}' into DB")
+
+        except Exception as e:
+            print("❌ Insert Error:", e)
 
     @pyqtSlot(result=str)
     def get_defect_images(self):
-
-        default_images = [
-            "https://picsum.photos/seed/metaldefect1/640/480",
-            "https://placehold.co/640x480/ef233c/fff?text=DENT+DEFECT",
-            "https://picsum.photos/seed/metaldefect1/640/480",
-            "https://placehold.co/640x480/ff4d6d/white?text=EDGE+SLIVER",
-        ]
-
-        # Camera detected images
-        extra_images = [
-            "https://placehold.co/640x480/ff4d6d/white?text=EDGE+SLIVER",
-            "https://placehold.co/640x480/ff4d6d/white?text=EDGE+SLIVER"
-        ]
-
-        images = []
-
-        # ✅ Add all trained images
-        images.extend(default_images)
-
-        # ✅ Compare detected images
-        for img in extra_images:
-
-            # IMAGE NOT MATCHED → DEFECT
-            if img not in default_images:
-                print("🔥 DEFECT IMAGE:", img)
-                images.append(img)
-
-        return json.dumps({"images": images})
-
-
+        data = {
+            "images": [
+                "https://placehold.co/640x480/ff4d6d/white?text=EDGE+SLIVER",
+                "https://placehold.co/640x480/ef233c/fff?text=DENT+DEFECT",
+                "https://picsum.photos/seed/metaldefect1/640/480",
+                "https://placehold.co/640x480/c1121f/white?text=SCRATCH+DEFECT",
+                "https://picsum.photos/seed/industrialdefect/640/480",
+                "https://placehold.co/640x480/d00000/fff?text=CRACK+DETECTED",
+            ]
+        }
+        return json.dumps(data)
 
     @pyqtSlot(str, result=str)
     def get_counts(self, job_id):
         if job_id == "Product A":
-            inspected = 120
-            good = 110
-            defective = 10
+            inspected = 0
+            good = 0
+            defective = 0
         elif job_id == "Product B":
-            inspected = 90
-            good = 80
-            defective = 10
+            inspected = 0
+            good = 0
+            defective = 0
         else:
             # default fallback
             inspected = 0
@@ -290,7 +434,8 @@ class Bridge(QObject):
         }
         return json.dumps(data)
 
-  
+ 
+
     @pyqtSlot(str)
     def saveTrainingSession(self, json_str: str):
         try:

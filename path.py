@@ -35,6 +35,14 @@ def run_path() -> Path:
 APP_DIR = app_path()
 
 
+# STATIC FILES
+STATIC_DIR = APP_DIR / "static"
+CSS_DIR = STATIC_DIR / "css"
+JS_DIR = STATIC_DIR / "script"
+IMG_DIR = STATIC_DIR / "img"
+FONTS_DIR = STATIC_DIR / "fonts"
+WEBFONTS_DIR = STATIC_DIR / "webfonts"
+
 # TEMPLATES
 TEMPLATES_DIR = APP_DIR / "templates"
 
@@ -62,6 +70,13 @@ DATA_DIR = RUN_DIR / "data"
 TRAINING_IMAGES_DIR = DATA_DIR / "training_images"
 PREDICTION_IMAGES_DIR = DATA_DIR / "prediction_images"
 
+
+#USER CONFIG
+USER_CONFIG_FILE = RUN_DIR / "settings.json"
+
+# DATABASE
+DB_FILE = RUN_DIR / "job_id.db"
+
 # MODELS
 MODELS_DIR = RUN_DIR / "models"
 DEFAULT_MODEL = MODELS_DIR / "best.pt"
@@ -70,6 +85,7 @@ DEFAULT_MODEL = MODELS_DIR / "best.pt"
 SETTINGS_FILE = RUN_DIR / "settings.json"
 TRAINING_SETTINGS_FILE = RUN_DIR / "training_settings.json"
 CONTROLLER_SETTINGS_FILE = RUN_DIR / "controller_setting.json"
+
 
 # SIGNAL FILES
 SIGNAL_FILE = RUN_DIR / "signal.txt"
@@ -94,3 +110,6 @@ if not SIGNAL_FILE.exists():
 
 if not COUNT_FILE.exists():
     COUNT_FILE.write_text("0", encoding="utf-8")
+
+if not USER_CONFIG_FILE.exists():
+    USER_CONFIG_FILE.write_text("{}", encoding="utf-8")
