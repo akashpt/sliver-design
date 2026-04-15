@@ -1,3 +1,6 @@
+
+
+
 // ─── Clock ──────────────────────────────────────────────────────────
 setInterval(() => {
   document.getElementById("clock").textContent = new Date()
@@ -7,6 +10,7 @@ setInterval(() => {
 
 // ─── Global Variables ───────────────────────────────────────────────
 let isRunning = false;
+let isUIReset = false;
 let currentJobId = "";
 let currentThreshold = "";
 let inspected = 0;
@@ -17,6 +21,7 @@ let uptimeTimer = null;
 let demoDefectInterval = null;
 let bridge = null;
 let currentStream = null;
+let frameSignalConnected = false; // FIX: safe guard for frame_signal connection
 
 let defectHistory = [];
 let currentModalIndex = -1;
@@ -25,6 +30,43 @@ let currentModalIndex = -1;
 document.addEventListener("DOMContentLoaded", function () {
   new QWebChannel(qt.webChannelTransport, async function (channel) {
     bridge = channel.objects.bridge;
+
+    // FIX: properly indented inside QWebChannel callback
+    // ─── Connect counts_signal ───────────────────────────────────────
+    if (bridge.counts_signal) {
+      bridge.counts_signal.connect(function (data) {
+        if (isUIReset) return; // 🔥 BLOCK backend updates
+
+        console.log("📊 Counts Signal Received:", data);
+        const parsed = JSON.parse(data);
+        inspected = parsed.inspected || 0;
+        good = parsed.good || 0;
+        bad = parsed.defective || 0;
+        updateCounters();
+      });
+    }
+
+    // ─── Connect defect_images_signal ────────────────────────────────
+    // FIX: was never connected in original — now connected for real-time push
+    if (bridge.defect_images_signal) {
+      bridge.defect_images_signal.connect(function (data) {
+        console.log("🖼️ Defect Images Signal Received:", data);
+        const parsed = JSON.parse(data);
+        const images = parsed?.images || [];
+
+        defectHistory = [];
+        images.forEach((src) => {
+          if (!src) return;
+          defectHistory.push({
+            time: new Date().toLocaleTimeString(),
+            src: src,
+          });
+        });
+
+        renderDefectThumbs();
+      });
+    }
+
     if (bridge) {
       showToast("✅ Bridge Connected Successfully", 3000);
       if (bridge) {
@@ -55,58 +97,12 @@ document.addEventListener("DOMContentLoaded", function () {
   const jobIdInput = document.getElementById("jobIdInput");
   const thresholdInput = document.getElementById("thresholdInput");
 
-  // Enable OK button check
   jobIdInput.addEventListener("change", checkCanConfirm);
   thresholdInput.addEventListener("input", checkCanConfirm);
 });
 
-// document.addEventListener("DOMContentLoaded", () => {
-//   loadDefectImagesFromBridge();
-// });
-
-const USER_CONFIG_KEY = "userConfig"; // localStorage key (fallback)
+const USER_CONFIG_KEY = "userConfig";
 const USER_CONFIG_DEFAULTS = { jobId: "", threshold: "" };
-
-/**
- * Populate the two input fields from saved config.
- * Called once on DOMContentLoaded (after bridge is ready).
- */
-// async function populateInputsFromConfig() {
-
-//   // const cfg = await readUserConfig();
-
-//   const jobInput = document.getElementById("jobIdInput");
-//   const thresholdInput = document.getElementById("thresholdInput");
-
-//   if (!jobInput || !thresholdInput) return;
-
-//   // jobIdInput is a <select> — only set if the option exists
-//   if (cfg.jobId) {
-//     const matchingOption = [...jobInput.options].find(
-//       (o) => o.value === cfg.jobId,
-//     );
-//     if (matchingOption) {
-//       jobInput.value = cfg.jobId;
-//     } else {
-//       // Option not loaded yet (async job list). Store for deferred assignment.
-//       jobInput.dataset.pendingValue = cfg.jobId;
-//     }
-//   }
-
-//   // thresholdInput is a plain text/number input
-//   if (cfg.threshold) {
-//     thresholdInput.value = cfg.threshold;
-//   }
-
-//   checkCanConfirm();
-
-//   if (cfg.jobId || cfg.threshold) {
-//     showToast(
-//       `📂 Config loaded — Job: ${cfg.jobId || "—"} | Threshold: ${cfg.threshold || "—"}`,
-//       3000,
-//     );
-//   }
-// }
 
 /**
  * Debounce helper — prevents flooding the bridge on every keystroke.
@@ -127,15 +123,14 @@ async function loadDropdownData() {
     let presetJobId = "";
     let presetThreshold = "";
 
-    // Primary: Qt bridge → bridge.current_job_id()
     if (bridge && typeof bridge.current_job_id === "function") {
       try {
         const raw = await bridge.current_job_id();
         if (raw) {
           const parsed = JSON.parse(raw);
-          // alert(parsed.data.jobs);
           jobs = parsed?.data?.jobs ?? [];
           thresholds = parsed?.data?.thresholds ?? [];
+          // FIX: bridge.py returns "job_id" key (not "jobId") — read correctly
           presetJobId = String(parsed?.job_id ?? "");
           presetThreshold = String(parsed?.threshold ?? "");
         }
@@ -165,7 +160,6 @@ async function loadDropdownData() {
     const thresholdInput = document.getElementById("thresholdInput");
 
     if (presetJobId) {
-      // Select the matching option in the dropdown
       const match = [...jobSelect.options].find((o) => o.value === presetJobId);
 
       if (match) {
@@ -176,7 +170,6 @@ async function loadDropdownData() {
       }
 
       if (match && presetThreshold) {
-        // Lock the dropdown — value is set by the system
         jobSelect.disabled = true;
         jobSelect.style.opacity = "0.6";
         jobSelect.style.cursor = "not-allowed";
@@ -188,13 +181,11 @@ async function loadDropdownData() {
         currentThreshold = presetThreshold;
       }
 
-      // Mirror into currentJobId so confirmConfig works immediately
       currentJobId = presetJobId;
       const label = document.getElementById("jobIdLabel");
       if (label) label.textContent = presetJobId;
     }
 
-    // If both preset values are present, treat config as already confirmed
     if (presetJobId && presetThreshold) {
       document.getElementById("okBtn").disabled = true;
       document.getElementById("startBtn").disabled = false;
@@ -222,10 +213,9 @@ async function loadDefectImagesFromBridge() {
 
     const raw = await bridge.get_defect_images();
     const parsed = JSON.parse(raw);
-
     const images = parsed?.images || [];
 
-    defectHistory = []; // 🔥 RESET
+    defectHistory = [];
 
     images.forEach((src) => {
       if (!src) return;
@@ -241,26 +231,40 @@ async function loadDefectImagesFromBridge() {
     console.error("❌ Failed loading defect images:", err);
   }
 }
-// count add ------------------------------------------
-async function loadCountsFromBridge() {
+
+// ─── Load Counts from Bridge ─────────────────────────────────────────
+function loadCountsFromBridge() {
   try {
     if (!bridge || typeof bridge.get_counts !== "function") {
       console.warn("Counts API not available");
       return;
     }
 
-    const raw = await bridge.get_counts(currentJobId);
-    const parsed = JSON.parse(raw);
+    if (!currentJobId) {
+      console.warn("❌ No Job ID — skipping get_counts");
+      return;
+    }
 
-    // ✅ SET GLOBAL VARIABLES
-    inspected = parsed.inspected || 0;
-    good = parsed.good || 0;
-    bad = parsed.defective || 0;
+    console.log("📡 Calling get_counts with:", currentJobId);
 
-    // ✅ UPDATE UI
-    updateCounters();
+    bridge.get_counts(currentJobId, function (raw) {
+      console.log("🔥 CALLBACK RESPONSE:", raw);
 
-    console.log("✅ Counts Loaded", parsed);
+      try {
+        const parsed = JSON.parse(raw);
+
+        inspected = parsed.inspected || 0;
+        good = parsed.good || 0;
+        bad = parsed.defective || 0;
+
+        updateCounters();
+
+        console.log("✅ Counts Loaded", parsed);
+      } catch (e) {
+        console.error("❌ JSON parse error:", e);
+      }
+    });
+
   } catch (err) {
     console.error("❌ Failed to load counts:", err);
   }
@@ -327,9 +331,9 @@ function confirmConfig() {
   currentJobId = jobId;
   currentThreshold = threshold;
   saveUserConfigToBridge(jobId, threshold);
+  loadCountsFromBridge();
   document.getElementById("jobIdLabel").textContent = jobId;
 
-  // Lock both inputs after confirmation
   const jobSelect = document.getElementById("jobIdInput");
   const thresholdInput = document.getElementById("thresholdInput");
 
@@ -339,9 +343,6 @@ function confirmConfig() {
   thresholdInput.disabled = true;
   thresholdInput.style.opacity = "0.6";
   thresholdInput.style.cursor = "not-allowed";
-
-  // Persist confirmed values immediately (no debounce)
-  // writeUserConfig(jobId, threshold);
 
   showToast(
     `✅ Configuration Confirmed!<br>Job: ${jobId} | Threshold: ${threshold}`,
@@ -353,7 +354,6 @@ function confirmConfig() {
   document.getElementById("okBtn").disabled = true;
 }
 
-// ─── Reset Configuration ────────────────────────────────────────────
 function resetConfig() {
   bridge.resetUserConfig();
 
@@ -366,7 +366,9 @@ function resetConfig() {
   currentThreshold = "";
   document.getElementById("jobIdLabel").textContent = "—";
 
-  // Re-enable fields that may have been locked by bridge preset
+  // ❌ REMOVE this (important)
+  // saveUserConfigToBridge(currentJobId, currentThreshold);
+
   jobSelect.disabled = false;
   jobSelect.style.opacity = "1";
   jobSelect.style.cursor = "pointer";
@@ -374,19 +376,17 @@ function resetConfig() {
   thresholdInput.style.opacity = "1";
   thresholdInput.style.cursor = "pointer";
 
-  enableSideMenu(); // Re-enable menu on reset
+  enableSideMenu();
 
   document.getElementById("startBtn").disabled = true;
   document.getElementById("okBtn").disabled = true;
 
   // Persist the cleared state so next launch starts blank
   // writeUserConfig("", "");
-  
-  showToast("Configuration Reset", 2500);
-  addLog("Configuration Reset");
-}
 
-// ─── Reset to Initial State ─────────────────────────────────────────
+  showToast("Configuration Reset", 2500);
+  addLog("Configuration Reset (UI only)");
+}
 function resetToInitialState() {
   isRunning = false;
   stopAllCameras();
@@ -399,17 +399,23 @@ function resetToInitialState() {
   document.getElementById("jobIdInput").disabled = false;
   document.getElementById("thresholdInput").disabled = false;
 
-  enableSideMenu(); // Ensure menu is enabled initially
+  enableSideMenu();
 
   hideCameraFeed();
   document.getElementById("statusLabel").textContent = "STANDBY";
   document.getElementById("jobIdLabel").textContent = "—";
+
+  // 🔥 ALSO APPLY UI RESET MODE HERE
+  isUIReset = true;
+
   inspected = 0;
   good = 0;
   bad = 0;
-  updateCounters();
-}
 
+  updateCounters();
+
+  stopUptime();
+}
 // ─── Camera Helpers ─────────────────────────────────────────────────
 function showCameraFeed() {
   const videoFeed = document.getElementById("videoFeed");
@@ -417,28 +423,24 @@ function showCameraFeed() {
   const liveBadge = document.getElementById("liveBadge");
   const cameraWrap = document.querySelector(".camera-wrap");
 
-  // Make sure container is visible
   if (cameraWrap) cameraWrap.style.display = "block";
 
-  disableSideMenu(); // Disable menu after start
+  disableSideMenu();
 
   noFeed.style.display = "none";
-  videoFeed.style.display = "block"; // Show video element initially
+  videoFeed.style.display = "block";
   if (liveBadge) liveBadge.style.display = "flex";
 
-  // Remove any previous qtFrameImg so we start clean
   const existingQtImg = document.getElementById("qtFrameImg");
   if (existingQtImg) existingQtImg.remove();
 }
 
+// FIX: removed duplicate hideCameraFeed() — keeping only the full version
 function hideCameraFeed() {
   const videoFeed = document.getElementById("videoFeed");
   const noFeed = document.getElementById("noFeed");
   const liveBadge = document.getElementById("liveBadge");
   const cameraWrap = document.querySelector(".camera-wrap");
-
-  // Stop any stream
-  stopAllCameras();
 
   noFeed.style.display = "flex";
   videoFeed.style.display = "none";
@@ -449,23 +451,12 @@ function hideCameraFeed() {
   if (existingQtImg) existingQtImg.remove();
 }
 
-function hideCameraFeed() {
-  const videoFeed = document.getElementById("videoFeed");
-  const noFeed = document.getElementById("noFeed");
-  const liveBadge = document.getElementById("liveBadge");
-
-  videoFeed.style.display = "none";
-  noFeed.style.display = "flex";
-  if (liveBadge) liveBadge.style.display = "none";
-}
-
 function stopAllCameras() {
   if (currentStream) {
     currentStream.getTracks().forEach((track) => track.stop());
     currentStream = null;
   }
 
-  // Also stop Qt bridge camera if available
   if (bridge && typeof bridge.stopCamera === "function") {
     try {
       bridge.stopCamera();
@@ -474,7 +465,7 @@ function stopAllCameras() {
     }
   }
 
-  hideCameraFeed(); // This will now properly clean up
+  hideCameraFeed();
 }
 
 // ─── Start Laptop Webcam (Fallback) ─────────────────────────────────
@@ -508,7 +499,8 @@ function startDetection() {
   }
 
   showCameraFeed();
-  loadCountsFromBridge(); 
+  loadCountsFromBridge();
+
   document.getElementById("statusLabel").textContent = "ACTIVE";
 
   setUIState(true);
@@ -516,18 +508,19 @@ function startDetection() {
 
   addLog(`Detection Started - Job ID: ${currentJobId}`);
 
+  // ─── CAMERA START ─────────────────────────────────────
   if (bridge && typeof bridge.startCamera === "function") {
     try {
       bridge.startCamera();
-      showToast("✅ Industrial Camera Started via Bridge", 2500);
+      showToast("✅ Camera Started", 2500);
 
-      // Connect frame signal (only once)
-      if (bridge.frame_signal && !bridge.frame_signal._connected) {
+      if (bridge.frame_signal && !frameSignalConnected) {
         bridge.frame_signal.connect((base64Image) => {
           updateVideoFeedFromBase64(base64Image);
         });
-        bridge.frame_signal._connected = true;
+        frameSignalConnected = true;
       }
+
     } catch (e) {
       console.error(e);
       startLaptopWebcam();
@@ -536,48 +529,41 @@ function startDetection() {
     startLaptopWebcam();
   }
 
-  // // Demo defect simulation
-  // demoDefectInterval = setInterval(() => {
-  //   inspected++;
-  //   const isDefect = Math.random() < 0.3;
+  // Demo defect simulation
+  demoDefectInterval = setInterval(() => {
+    inspected++;
+    const isDefect = Math.random() < 0.3;
 
-  //   if (isDefect) {
-  //     bad++;
-  //     const randomSrc = [Math.floor(Math.random())];
+    if (isDefect) {
+      bad++;
+      const randomSrc = [Math.floor(Math.random())];
 
-  //     defectHistory.unshift({
-  //       time: new Date().toLocaleTimeString([], {
-  //         hour: "2-digit",
-  //         minute: "2-digit",
-  //       }),
-  //       src: randomSrc,
-  //     });
+      defectHistory.unshift({
+        time: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        src: randomSrc,
+      });
 
-  //     if (defectHistory.length > 10) defectHistory.pop();
+      if (defectHistory.length > 10) defectHistory.pop();
 
-  //     addLog('<span style="color:#ef233c">⚠️ DEFECT DETECTED</span>');
-  //     renderDefectThumbs();
-  //   } else {
-  //     good++;
-  //   }
-  //   updateCounters();
-  // }, 5000);
+      addLog('<span style="color:#ef233c">⚠️ DEFECT DETECTED</span>');
+      renderDefectThumbs();
+    } else {
+      good++;
+    }
+    updateCounters();
+  }, 5000);
 }
 
 // ─── Stop Detection ─────────────────────────────────────────────────
 function stopDetection() {
   if (!isRunning) return;
 
-  // Stop everything
+  // FIX: stopAllCameras() already calls bridge.stopCamera() internally
+  // removed the redundant explicit bridge.stopCamera() call
   stopAllCameras();
-
-  if (bridge && typeof bridge.stopCamera === "function") {
-    try {
-      bridge.stopCamera();
-    } catch (e) {
-      console.error("Error stopping camera via bridge:", e);
-    }
-  }
 
   // if (demoDefectInterval) {
   //   clearInterval(demoDefectInterval);
@@ -589,7 +575,6 @@ function stopDetection() {
 
   document.getElementById("statusLabel").textContent = "STANDBY";
 
-  // IMPORTANT: Re-enable side menu when stopping
   enableSideMenu();
 
   showToast("🛑 Detection Stopped", 3000);
@@ -614,11 +599,11 @@ function setUIState(running) {
     okBtn.disabled = true;
     resetBtn.disabled = true;
   } else {
-    startBtn.disabled = false; // ← Fixed: Allow starting again 
+    startBtn.disabled = false; // ← Fixed: Allow starting again
     stopBtn.disabled = true;
     jobSelect.disabled = true;
     thresholdInput.disabled = true;
-    okBtn.disabled = true; // Allow re-config if needed
+    okBtn.disabled = true;
     resetBtn.disabled = false;
   }
 }
@@ -651,7 +636,6 @@ function updateVideoFeedFromBase64(base64Image) {
   const videoEl = document.getElementById("videoFeed");
 
   if (!feedImg) {
-    // Create Qt image only when first frame arrives
     feedImg = document.createElement("img");
     feedImg.id = "qtFrameImg";
     feedImg.style.cssText = `
@@ -663,13 +647,11 @@ function updateVideoFeedFromBase64(base64Image) {
       display: block;
     `;
 
-    // Hide the <video> element when using Qt frames
     if (videoEl) videoEl.style.display = "none";
 
     videoContainer.appendChild(feedImg);
   }
 
-  // Update the source
   feedImg.src = "data:image/jpeg;base64," + base64Image;
 }
 
@@ -747,19 +729,6 @@ function closeDefectModal() {
   const modal = document.getElementById("defectModal");
   if (modal) modal.style.display = "none";
 }
-
-// function downloadDefectImage() {
-//   if (currentModalIndex < 0 || currentModalIndex >= defectHistory.length)
-//     return;
-//   const defect = defectHistory[currentModalIndex];
-//   const link = document.createElement("a");
-//   link.href = defect.src;
-//   link.download = `sliver_defect_${currentModalIndex + 1}_${Date.now()}.jpg`;
-//   document.body.appendChild(link);
-//   link.click();
-//   document.body.removeChild(link);
-//   showToast("✅ Defect image downloaded", 2500);
-// }
 
 // ─── Toast & Log ────────────────────────────────────────────────────
 function showToast(msg, ms = 3500, type = "success") {
@@ -887,7 +856,7 @@ document.getElementById("settingsModal")?.addEventListener("click", (e) => {
   if (e.target === e.currentTarget) closeSettings();
 });
 
-// defect image zoom
+// ─── Defect Image Zoom ───────────────────────────────────────────────
 const image = document.getElementById("defectModalImage");
 const viewer = document.getElementById("imageViewer");
 
@@ -907,16 +876,10 @@ let startX = 0;
 let startY = 0;
 let isDragging = false;
 
-// ===================
-// APPLY TRANSFORM
-// ===================
 function updateTransform() {
   image.style.transform = `translate3d(${posX}px, ${posY}px, 0) scale(${zoomLevel})`;
 }
 
-// ===================
-// RESET FUNCTION
-// ===================
 function resetView() {
   zoomLevel = 1;
   posX = 0;
@@ -924,9 +887,6 @@ function resetView() {
   updateTransform();
 }
 
-// ===================
-// ZOOM IN
-// ===================
 zoomInBtn.onclick = () => {
   if (zoomLevel < maxZoom) {
     zoomLevel += zoomStep;
@@ -934,15 +894,12 @@ zoomInBtn.onclick = () => {
   }
 };
 
-// ===================
-// ZOOM OUT
-// ===================
 zoomOutBtn.onclick = () => {
   if (zoomLevel > minZoom) {
     zoomLevel -= zoomStep;
 
     if (zoomLevel <= 1) {
-      resetView(); // ⭐ FIX
+      resetView();
       return;
     }
 
@@ -950,14 +907,8 @@ zoomOutBtn.onclick = () => {
   }
 };
 
-// ===================
-// RESET BUTTON
-// ===================
 resetBtn.onclick = resetView;
 
-// ===================
-// DRAG START
-// ===================
 viewer.addEventListener("mousedown", (e) => {
   if (zoomLevel <= 1) return;
 
@@ -968,9 +919,6 @@ viewer.addEventListener("mousedown", (e) => {
   startY = e.clientY - posY;
 });
 
-// ===================
-// DRAG MOVE
-// ===================
 window.addEventListener("mousemove", (e) => {
   if (!isDragging) return;
 
@@ -980,20 +928,16 @@ window.addEventListener("mousemove", (e) => {
   updateTransform();
 });
 
-// ===================
-// DRAG END
-// ===================
 window.addEventListener("mouseup", () => {
   isDragging = false;
   viewer.classList.remove("dragging");
 });
-// mouse wheel scrool
+
 viewer.addEventListener("wheel", (e) => {
   e.preventDefault();
 
   const rect = viewer.getBoundingClientRect();
 
-  // mouse position inside viewer
   const mouseX = e.clientX - rect.left;
   const mouseY = e.clientY - rect.top;
 
@@ -1001,16 +945,13 @@ viewer.addEventListener("wheel", (e) => {
 
   let newZoom =
     e.deltaY < 0
-      ? zoomLevel + scaleAmount // scroll up
-      : zoomLevel - scaleAmount; // scroll down
+      ? zoomLevel + scaleAmount
+      : zoomLevel - scaleAmount;
 
-  // limit zoom
   newZoom = Math.min(maxZoom, Math.max(minZoom, newZoom));
 
-  // stop if same zoom
   if (newZoom === zoomLevel) return;
 
-  // 🔥 zoom towards mouse position
   const zoomRatio = newZoom / zoomLevel;
 
   posX = mouseX - (mouseX - posX) * zoomRatio;
@@ -1018,7 +959,6 @@ viewer.addEventListener("wheel", (e) => {
 
   zoomLevel = newZoom;
 
-  // auto reset when normal size
   if (zoomLevel <= 1) {
     resetView();
     return;
@@ -1027,31 +967,29 @@ viewer.addEventListener("wheel", (e) => {
   updateTransform();
 });
 
-
+// ─── Save User Config to Bridge ──────────────────────────────────────
 function saveUserConfigToBridge(jobId, threshold) {
   if (!bridge || typeof bridge.saveUserConfig !== "function") {
+    console.log("Bridge:", bridge);
+    console.log("get_counts:", bridge.get_counts);
     console.warn("Bridge saveUserConfig not available");
     return;
   }
 
   bridge.saveUserConfig(jobId, threshold, function (response) {
-
     const result = JSON.parse(response);
 
     if (result.status === "success") {
-      
-      console.log("🔥 Calling saveUserConfig", jobId, threshold);
+
       console.log("🟢 PROCESS CONFIRMED");
-      console.log("Job:", result.data.jobId);
-      console.log("Threshold:", result.data.threshold);
+      console.log("Job:", result.jobId);
 
       showToast("✅ Process Confirmed", 3000);
-
       addLog("PROCESS CONFIRMED ✅");
-
     } else {
       console.error("❌ Save Failed:", result.message);
       showToast("❌ Save failed", 3000, "error");
     }
   });
 }
+
