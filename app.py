@@ -1,13 +1,39 @@
 # app.py
 import sys
+import os
 from PyQt5.QtWidgets import QApplication, QMainWindow
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtCore import QUrl
-
+from pathlib import Path
 from classes.bridge import Bridge
 from path import TEMPLATES_DIR,REPORT_PAGE
 
+
+IS_WINDOWS = sys.platform.startswith("win")
+IS_LINUX = sys.platform.startswith("linux")
+
+# ===============================
+# Platform selection
+# ===============================
+if IS_LINUX:
+    os.environ["QT_QPA_PLATFORM"] = "xcb"
+elif IS_WINDOWS:
+    os.environ["QT_QPA_PLATFORM"] = "windows"
+
+
+if getattr(sys, 'frozen', False):
+   
+    base = Path(sys.executable).resolve().parent
+    import cv2
+    cv2_path = os.path.dirname(cv2.__file__)
+    os.environ["QT_PLUGIN_PATH"] = os.path.join(cv2_path, "qt", "plugins")
+    os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = os.path.join(cv2_path, "qt", "plugins", "platforms")
+
+else:
+    import cv2 as _cv2
+    qt_plugin_path = os.path.join(os.path.dirname(_cv2.__file__), "qt", "plugins", "platforms")
+    os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = qt_plugin_path
 
 class MainWindow(QMainWindow):
 
