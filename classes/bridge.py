@@ -9,6 +9,7 @@ from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QTimer, QStandardPaths, 
 from PyQt5.QtWidgets import QApplication  # Only if needed elsewhere
 from classes.mindvision import MindVisionCamera
 from path import *
+from classes.training import StripColorTraining
 
 
 class Bridge(QObject):
@@ -30,6 +31,11 @@ class Bridge(QObject):
         self.cap = None
         self.use_mindvision = False
         self.camera_open = False
+        self.current_frame = None
+        self.training_running = False
+        self.training_folder_name = ""
+        self.training_save_interval = 1000   # milliseconds
+        self.last_training_save_time = 0
 
         # Frame timer
         self.timer = QTimer()
@@ -110,7 +116,53 @@ class Bridge(QObject):
         except Exception as e:
             print("Reset config error:", e)
 
-    
+    def get_training_job_folder(self, job_id: str, clear_existing: bool = False):
+        job_id = (job_id or "").strip()
+
+        if not job_id:
+            job_id = "Unknown_Product"
+
+        safe_job_id = "".join(
+            ch if ch.isalnum() or ch in (" ", "_", "-") else "_"
+            for ch in job_id
+        ).strip()
+
+        job_folder = TRAINING_IMAGES_DIR / safe_job_id
+        job_folder.mkdir(parents=True, exist_ok=True)
+
+        if clear_existing:
+            for file_path in job_folder.iterdir():
+                if file_path.is_file():
+                    try:
+                        file_path.unlink()
+                        print(f"🗑 Deleted old training image: {file_path.name}")
+                    except Exception as e:
+                        print(f"❌ Could not delete {file_path.name}: {e}")
+
+        return job_folder
+
+
+    def save_training_image(self, frame, job_id: str):
+        """
+        Save one training image inside:
+        Sliver_Data/data/training_images/<job_id>/
+        """
+        try:
+            job_folder = self.get_training_job_folder(job_id)
+
+            filename = f"train_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.bmp"
+            file_path = job_folder / filename
+
+            ok = cv2.imwrite(str(file_path), frame)
+            if not ok:
+                raise Exception("cv2.imwrite failed")
+
+            print(f"✅ Training image saved: {file_path}")
+            return str(file_path)
+
+        except Exception as e:
+            print(f"❌ save_training_image error: {e}")
+            return ""
         
    
     @pyqtSlot(result=str)
@@ -145,9 +197,14 @@ class Bridge(QObject):
                 return "Camera not available"
 
             print("✅ Using Webcam")
-
         self.camera_open = True
-        self.timer.start(3000)
+
+        # Grab one frame immediately so current_frame is ready
+        self.grab_frame()
+
+        # Continue live updates
+        self.timer.start(1000)
+
         return "OK"
 
     @pyqtSlot()
@@ -216,6 +273,21 @@ class Bridge(QObject):
             # SAVE CURRENT FRAME
             # =========================
             self.current_frame = frame.copy()
+
+            if self.training_running and self.training_folder_name:
+                current_time = int(datetime.now().timestamp() * 1000)
+
+                if current_time - self.last_training_save_time >= self.training_save_interval:
+                    saved_path = self.save_training_image(
+                        self.current_frame.copy(),
+                        self.training_folder_name
+                    )
+
+                    if saved_path:
+                        print(f"✅ Training image auto-saved: {saved_path}")
+                        self.last_training_save_time = current_time
+                    else:
+                        print("❌ Training image auto-save failed")
             # =========================
             # RUN DETECTION PER FRAME
             # =========================
@@ -275,12 +347,34 @@ class Bridge(QObject):
     #         },
     #     }
     #     return json.dumps(data)
+
+    def get_model_job_ids(self):
+        try:
+            if not MODELS_DIR.exists():
+                return []
+
+            job_ids = sorted(
+                [item.name for item in MODELS_DIR.iterdir() if item.is_dir()]
+            )
+            return job_ids
+
+        except Exception as e:
+            print("❌ Error reading model job ids:", e)
+            return []
+
     @pyqtSlot(result=str)
     def current_job_id(self):
-        default_job = "Product A"
         default_threshold = "45"
 
         try:
+            jobs = self.get_model_job_ids()
+
+            # Fallback if models folder is empty
+            if not jobs:
+                jobs = []
+
+            default_job = jobs[0] if jobs else ""
+
             job_id = default_job
             threshold = default_threshold
 
@@ -288,15 +382,20 @@ class Bridge(QObject):
                 with open(self.config_path, "r", encoding="utf-8") as f:
                     config = json.load(f)
 
-                # ✅ Override only if present in JSON
-                job_id = config.get("job_id", default_job)
-                threshold = config.get("threshold", default_threshold)
+                saved_job_id = config.get("job_id", "")
+                saved_threshold = config.get("threshold", default_threshold)
+
+                # use saved job only if it exists in models folder
+                if saved_job_id in jobs:
+                    job_id = saved_job_id
+
+                threshold = saved_threshold
 
             data = {
                 "job_id": job_id,
                 "threshold": threshold,
                 "data": {
-                    "jobs": ["Product A", "Product B", "Product C"],
+                    "jobs": jobs,
                     "thresholds": [1, 2, 3, 4, 5, 6],
                 },
             }
@@ -307,10 +406,10 @@ class Bridge(QObject):
             print("Error loading config:", e)
 
             data = {
-                "job_id": default_job,
+                "job_id": "",
                 "threshold": default_threshold,
                 "data": {
-                    "jobs": ["Product A", "Product B", "Product C"],
+                    "jobs": [],
                     "thresholds": [1, 2, 3, 4, 5, 6],
                 },
             }
@@ -441,23 +540,71 @@ class Bridge(QObject):
         try:
             data = json.loads(json_str)
             record = {
-                "jobId": data.get("jobId", ""),
                 "count": data.get("count", ""),
                 "yarn": data.get("yarn", ""),
                 "color": data.get("color", ""),
                 "savedAt": datetime.now().isoformat(timespec="seconds"),
             }
 
-            session_path = os.path.join(
-                os.path.dirname(self.config_path), "trainingSession.json"
-            )
-            with open(session_path, "w", encoding="utf-8") as f:
+            with open(TRAINING_SETTINGS_FILE, "w", encoding="utf-8") as f:
                 json.dump(record, f, indent=2)
 
-            print(f"✅ Training session saved: {record['jobId']}")
+            print("TRAINING_IMAGES_DIR =", TRAINING_IMAGES_DIR)
+
+            folder_name = f"{record['count']}_{record['yarn']}_{record['color']}"
+            folder_name = folder_name.replace(" ", "_")
+            print("folder_name =", folder_name)
+
+            job_folder = self.get_training_job_folder(folder_name, clear_existing=True)
+            print("job_folder =", job_folder)
+
+            # Mark training as active
+            self.training_running = True
+            self.training_folder_name = folder_name
+
+            print(f"✅ Training session started: {folder_name}")
+
         except Exception as e:
             print(f"❌ saveTrainingSession error: {e}")
 
+
+    @pyqtSlot(result=str)
+    def stopTrainingSession(self):
+        try:
+            if not self.training_folder_name:
+                return json.dumps({
+                    "ok": False,
+                    "message": "No active training folder found"
+                })
+
+            # Stop image saving
+            self.training_running = False
+
+            folder_name = self.training_folder_name
+            training_folder = TRAINING_IMAGES_DIR / folder_name
+
+            print("🛑 Training stopped for folder:", folder_name)
+            print("📂 Training images folder:", training_folder)
+
+            trainer = StripColorTraining()
+            result = trainer.train(str(training_folder), folder_name)
+
+            # Clear current training state
+            self.training_folder_name = ""
+            self.last_training_save_time = 0
+
+            return json.dumps(result)
+
+        except Exception as e:
+            print("❌ stopTrainingSession error:", e)
+            return json.dumps({
+                "ok": False,
+                "message": str(e)
+            })
+            
+
+
+       
     # Navigation
     @pyqtSlot()
     def goHome(self):
