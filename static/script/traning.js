@@ -37,15 +37,15 @@ document.addEventListener("DOMContentLoaded", function () {
   renderDefectThumbs();
   // resetToInitialState();
 
-  const jobIdInput = document.getElementById("jobIdInput");
+  // const jobIdInput = document.getElementById("jobIdInput");
   const thresholdInput = document.getElementById("thresholdInput");
 
   // Enable OK button check
-  jobIdInput.addEventListener("change", checkCanConfirm);
+  // jobIdInput.addEventListener("change", checkCanConfirm);
   thresholdInput.addEventListener("input", checkCanConfirm);
 
   // Auto-save to userConfig.json on every change (debounced 500 ms)
-  jobIdInput.addEventListener("change", autoSaveConfig);
+  // jobIdInput.addEventListener("change", autoSaveConfig);
   thresholdInput.addEventListener("input", autoSaveConfig);
 });
 
@@ -474,7 +474,7 @@ async function stopCamera() {
     if (activeMode !== null) return;
 
     // Clear + reset modal fields
-    ["tsJobId", "tsCount", "tsYarn", "tsColor"].forEach((id) => {
+    [ "tsCount", "tsYarn", "tsColor"].forEach((id) => {
       const el = $(id);
       if (el) {
         el.value = "";
@@ -484,7 +484,7 @@ async function stopCamera() {
 
     $("trainingSessionModal").style.display = "flex";
     // Auto-focus first field
-    setTimeout(() => $("tsJobId")?.focus(), 80);
+    setTimeout(() => $("tsCount")?.focus(), 80);
   }
 
   function cancelTrainingModal() {
@@ -495,8 +495,7 @@ async function stopCamera() {
   async function confirmTraining() {
     // ── Validate ALL four fields (all mandatory) ──────────────────────
     const fields = [
-      { id: "tsJobId", label: "Job ID" },
-      { id: "tsCount", label: "Count" },
+       { id: "tsCount", label: "Count" },
       { id: "tsYarn", label: "Yarn" },
       { id: "tsColor", label: "Color" },
     ];
@@ -524,7 +523,7 @@ async function stopCamera() {
       return; // stay on modal
     }
 
-    const jobId = $("tsJobId").value.trim();
+    
     const count = $("tsCount").value.trim();
     const yarn = $("tsYarn").value.trim();
     const color = $("tsColor").value.trim();
@@ -533,10 +532,10 @@ async function stopCamera() {
     $("trainingSessionModal").style.display = "none";
 
     // Send values to bridge.py → saveTrainingSession()
-    Bridge.sendTrainingSession({ jobId, count, yarn, color });
+    Bridge.sendTrainingSession({  count, yarn, color });
 
     // Update header Job ID pill
-    $("jobIdLabel").textContent = jobId;
+    // $("jobIdLabel").textContent = jobId;
 
     // Start camera
     const ok = await openCamera();
@@ -546,19 +545,58 @@ async function stopCamera() {
     $("statusLabel").textContent = "TRAINING";
     applyUIState("training");
     addLog(
-      `🎓 Training — Job: <strong>${jobId}</strong>` +
-        ` · Count: ${count} · Yarn: ${yarn} · Color: ${color}`,
+      `🎓 Training — Job: · Count: ${count} · Yarn: ${yarn} · Color: ${color}`,
     );
   }
 
-  function stopTraining() {
-    if (activeMode !== "training") return;
-    stopCamera();
-    activeMode = null;
-    $("statusLabel").textContent = "STANDBY";
-    applyUIState(null);
-    addLog("⏹ Training camera stopped.");
+  // function stopTraining() {
+  //   if (activeMode !== "training") return;
+  //   stopCamera();
+  //   activeMode = null;
+  //   $("statusLabel").textContent = "STANDBY";
+  //   applyUIState(null);
+  //   addLog("⏹ Training camera stopped.");
+  // }
+  async function stopTraining() {
+  if (activeMode !== "training") return;
+
+  await stopCamera();
+
+  if (
+    typeof window.bridge !== "undefined" &&
+    window.bridge &&
+    typeof window.bridge.stopTrainingSession === "function"
+  ) {
+    window.bridge.stopTrainingSession(function (raw) {
+      let res = raw;
+
+      try {
+        if (typeof raw === "string") {
+          res = JSON.parse(raw);
+        }
+      } catch (e) {
+        console.error("JSON parse error:", e);
+      }
+
+      if (res?.ok) {
+        showToast("✅ Training completed and model generated", 4000);
+        addLog("✅ Training stopped and model generated successfully.");
+      } else {
+        showToast(res?.message || "❌ Training failed", 4000);
+        addLog("❌ Training failed: " + (res?.message || "Unknown error"));
+      }
+    });
+  } else {
+    showToast("❌ stopTrainingSession bridge not available", 4000);
+    addLog("❌ stopTrainingSession bridge not available.");
   }
+
+  activeMode = null;
+  $("statusLabel").textContent = "STANDBY";
+  applyUIState(null);
+}
+
+
 
   // ── Init ─────────────────────────────────────────────────────────────
   function init() {
@@ -577,7 +615,7 @@ async function stopCamera() {
     });
 
     // Remove input-error highlight as user types
-    ["tsJobId", "tsCount", "tsYarn", "tsColor"].forEach((id) => {
+    [ "tsCount", "tsYarn", "tsColor"].forEach((id) => {
       $(id)?.addEventListener("input", () =>
         $(id).classList.remove("input-error"),
       );
@@ -735,5 +773,98 @@ function stopDetection() {
   if (demoDefectInterval) {
     clearInterval(demoDefectInterval);
     demoDefectInterval = null;
+  }
+}
+
+// async function stopTraining() {
+//   if (activeMode !== "training") return;
+
+//   await stopCamera();
+
+//   if (
+//     typeof window.bridge !== "undefined" &&
+//     window.bridge &&
+//     typeof window.bridge.stopTrainingSession === "function"
+//   ) {
+//     window.bridge.stopTrainingSession(function (raw) {
+//       let res = raw;
+
+//       try {
+//         if (typeof raw === "string") {
+//           res = JSON.parse(raw);
+//         }
+//       } catch (e) {
+//         console.error("JSON parse error:", e);
+//       }
+
+//       if (res?.ok) {
+//         showToast("✅ Training completed and model generated", 4000);
+//         addLog("✅ Training stopped and model generated successfully.");
+//       } else {
+//         showToast(res?.message || "❌ Training failed", 4000);
+//         addLog("❌ Training failed: " + (res?.message || "Unknown error"));
+//       }
+//     });
+//   } else {
+//     showToast("❌ stopTrainingSession bridge not available", 4000);
+//     addLog("❌ stopTrainingSession bridge not available.");
+//   }
+
+//   activeMode = null;
+//   $("statusLabel").textContent = "STANDBY";
+//   applyUIState(null);
+// }
+
+
+async function stopTrainingSession() {
+  try {
+    setStatus("Stopping training...");
+
+    const res = await slotPromise("stopTrainingSession");
+
+    if (res?.ok) {
+      showToast(res.message || "✅ Training stopped and model generated", "success", 4000);
+      setStatus("Training stopped successfully");
+
+      console.log("✅ stopTrainingSession success:", res);
+
+      // Optional: update UI buttons
+      const startBtn = document.getElementById("startTrainingBtn");
+      const stopBtn = document.getElementById("stopTrainingBtn");
+
+      if (startBtn) startBtn.disabled = false;
+      if (stopBtn) stopBtn.disabled = true;
+    } else {
+      showToast(res?.message || "❌ Failed to stop training", "error", 4000);
+      setStatus("Training stop failed");
+
+      console.warn("⚠ stopTrainingSession failed:", res);
+    }
+  } catch (err) {
+    console.error("❌ stopTrainingSession JS error:", err);
+    showToast("❌ Error while stopping training session", "error", 4000);
+    setStatus("Training stop error");
+  }
+}
+
+
+async function stopTrainingSession() {
+  try {
+    setStatus("Stopping training...");
+
+    const raw = await slotPromise("stopTrainingSession");
+    const res = typeof raw === "string" ? JSON.parse(raw) : raw;
+
+    if (res?.ok) {
+      showToast(res.message || "✅ Training stopped and model generated", "success", 4000);
+      setStatus("Training stopped successfully");
+    } else {
+      showToast(res?.message || "❌ Failed to stop training", "error", 4000);
+      setStatus("Training stop failed");
+    }
+  } catch (err) {
+    console.error("❌ stopTrainingSession JS error:", err);
+    showToast("❌ Error while stopping training session", "error", 4000);
+    setStatus("Training stop error");
   }
 }
