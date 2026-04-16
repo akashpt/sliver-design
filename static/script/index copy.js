@@ -264,28 +264,20 @@ async function loadDefectImagesFromBridge() {
 // count add ------------------------------------------
 async function loadCountsFromBridge() {
   try {
-    console.log("🔥 loadCountsFromBridge called");
-    console.log("currentJobId =", currentJobId);
-
     if (!bridge || typeof bridge.get_counts !== "function") {
       console.warn("Counts API not available");
       return;
     }
 
     const raw = await bridge.get_counts(currentJobId);
-    console.log("raw from bridge =", raw);
-
     const parsed = JSON.parse(raw);
-    console.log("parsed =", parsed);
 
+    // ✅ SET GLOBAL VARIABLES
     inspected = parsed.inspected || 0;
     good = parsed.good || 0;
     bad = parsed.defective || 0;
 
-    console.log("inspected =", inspected);
-    console.log("good =", good);
-    console.log("bad =", bad);
-
+    // ✅ UPDATE UI
     updateCounters();
 
     console.log("✅ Counts Loaded", parsed);
@@ -398,21 +390,23 @@ function resetConfig() {
   renderDefectThumbs();
   document.getElementById("jobIdLabel").textContent = "—";
 
+  // Re-enable fields that may have been locked by bridge preset
   jobSelect.disabled = false;
   jobSelect.style.opacity = "1";
   jobSelect.style.cursor = "pointer";
-
-  thresholdInput.disabled = false;
+  thresholurrentModalIndex = -1;
+  rdInput.disabled = false;
   thresholdInput.style.opacity = "1";
   thresholdInput.style.cursor = "pointer";
-  thresholdInput.style.background = "#ffffff";
-  thresholdInput.style.color = "";
 
-  enableSideMenu();
+  enableSideMenu(); // Re-enable menu on reset
 
   document.getElementById("startBtn").disabled = true;
   document.getElementById("okBtn").disabled = true;
 
+  // Persist the cleared state so next launch starts blank
+  // writeUserConfig("", "");
+  
   showToast("Configuration Reset", 2500);
   addLog("Configuration Reset");
 }
@@ -533,18 +527,13 @@ async function startLaptopWebcam() {
 
 // ─── Start Detection ────────────────────────────────────────────────
 function startDetection() {
-  console.log("🔥 startDetection called");
-  console.log("currentJobId =", currentJobId);
-  console.log("currentThreshold =", currentThreshold);
-
   if (isRunning || !currentJobId || !currentThreshold) {
     showToast("❌ Please click OK first", 3000, "error");
     return;
   }
 
   showCameraFeed();
-  console.log("🔥 calling loadCountsFromBridge...");
-  loadCountsFromBridge();
+  loadCountsFromBridge(); 
   document.getElementById("statusLabel").textContent = "ACTIVE";
 
   setUIState(true);
@@ -557,6 +546,7 @@ function startDetection() {
       bridge.startCamera();
       showToast("✅ Industrial Camera Started via Bridge", 2500);
 
+      // Connect frame signal (only once)
       if (bridge.frame_signal && !bridge.frame_signal._connected) {
         bridge.frame_signal.connect((base64Image) => {
           updateVideoFeedFromBase64(base64Image);
@@ -570,7 +560,6 @@ function startDetection() {
   } else {
     startLaptopWebcam();
   }
-
 
   // // Demo defect simulation
   // demoDefectInterval = setInterval(() => {
@@ -661,15 +650,11 @@ function setUIState(running) {
 
 // ─── Counters & Uptime ──────────────────────────────────────────────
 function updateCounters() {
-  console.log("🔥 updateCounters called");
-  console.log("setting inspectedCount =", inspected);
-  console.log("setting goodCount =", good);
-  console.log("setting badCount =", bad);
-
   document.getElementById("inspectedCount").textContent = inspected ?? 0;
   document.getElementById("goodCount").textContent = good ?? 0;
   document.getElementById("badCount").textContent = bad ?? 0;
 }
+
 function startUptime() {
   sessionStart = Date.now();
   uptimeTimer = setInterval(() => {

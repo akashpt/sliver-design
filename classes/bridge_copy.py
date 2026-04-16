@@ -26,7 +26,7 @@ class Bridge(QObject):
         # self.init_db()    
         print("DB Path:", self.db_path)            # create table automatically
 
-        # Camera
+         # Camera
         self.camera = None
         self.cap = None
         self.use_mindvision = False
@@ -172,10 +172,6 @@ class Bridge(QObject):
             return "Camera Already Running"
 
         print("🔥 Starting camera...")
-
-        job_id, _ = self.get_job_from_config()
-        if job_id:
-            self.load_db_counts_for_job(job_id)
 
         try:
             self.camera = MindVisionCamera()
@@ -357,6 +353,20 @@ class Bridge(QObject):
 
         return status
 
+    # ====================== OTHER METHODS ======================
+
+    # @pyqtSlot(result=str)
+    # def current_job_id(self):
+    #     data = {
+    #         "job_id": "Product A",
+    #         "threshold": "45",
+    #         "data": {
+    #             "jobs": ["Product A", "Product B", "Product C"],
+    #             "thresholds": [1, 2, 3, 4, 5, 6],
+    #         },
+    #     }
+    #     return json.dumps(data)
+
     def get_model_job_ids(self):
         try:
             if not MODELS_DIR.exists():
@@ -470,7 +480,85 @@ class Bridge(QObject):
 
         except Exception as e:
             print("❌ save_report_entry error:", e)
-    
+        
+    # def init_db(self):
+    #     try:
+    #         conn = sqlite3.connect(self.db_path)
+    #         cursor = conn.cursor()
+
+    #         cursor.execute("""
+    #         CREATE TABLE IF NOT EXISTS REPORT (
+    #             id INTEGER PRIMARY KEY AUTOINCREMENT,
+    #             shift_id INTEGER,
+    #             machine_no TEXT NOT NULL,
+    #             job_id TEXT NOT NULL,
+    #             result TEXT NOT NULL,
+    #             total_strips INTEGER,
+    #             bad_strips INTEGER,
+    #             bad_strip_number TEXT,
+    #             bad_image_path TEXT,
+    #             created_time TEXT,
+    #             updated_time TEXT DEFAULT CURRENT_TIMESTAMP,
+    #             FOREIGN KEY (shift_id) REFERENCES SHIFT(id)
+    #         )
+    #         """)
+
+    #         conn.commit()
+    #         conn.close()
+
+    #         print("✅ Database + Tables initialized")
+
+    #     except Exception as e:
+    #         print("❌ DB Init Error:", e)
+    #         #Creates jobs.db if not exists
+    #         # Creates jobs table if not exists
+    #         # Safe to run every time app starts ✅
+
+    # def insert_report(self):
+    #     print("🚀 insert_report called")
+    #     try:
+    #         job_id, threshold = self.get_job_from_config()
+    #         print("Fetched from config → Job ID:", job_id, "| Threshold:", threshold)
+
+    #         if not job_id:
+    #             print("⚠️ No job_id found in config")
+    #             return
+
+    #         conn = sqlite3.connect(self.db_path)
+    #         cursor = conn.cursor()
+
+    #         cursor.execute("""
+    #             INSERT INTO REPORT (
+    #                 shift_id,
+    #                 machine_no,
+    #                 job_id,
+    #                 result,
+    #                 total_strips,
+    #                 bad_strips,
+    #                 bad_strip_number,
+    #                 bad_image_path,
+    #                 created_time
+    #             )
+    #             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    #         """, (
+    #             1,                          # shift_id (dummy for now)
+    #             "M1",                       # machine_no
+    #             job_id,                     # ✅ from JSON
+    #             "GOOD",                     # result
+    #             8,                          # total_strips
+    #             1,                          # bad_strips
+    #             "2,5,10",                   # bad_strip_number
+    #             "path/to/image.jpg",        # bad_image_path
+    #             datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # created_time
+    #         ))
+
+    #         conn.commit()
+    #         conn.close()
+    #         print("🚀 insert_report called")
+    #         print(f"✅ Inserted job_id '{job_id}' into DB")
+
+    #     except Exception as e:
+    #         print("❌ Insert Error:", e)
 
     @pyqtSlot(result=str)
     def get_defect_images(self):
@@ -505,89 +593,29 @@ class Bridge(QObject):
 
     @pyqtSlot(str, result=str)
     def get_counts(self, job_id):
-        try:
-            print("🔥 get_counts CALLED")
-            print("job_id from UI =", job_id)
-            print("db_path =", self.db_path)
+        if job_id == "Product A":
+            inspected = 0
+            good = 0
+            defective = 0
+        elif job_id == "Product B":
+            inspected = 0
+            good = 0
+            defective = 0
+        else:
+            # default fallback
+            inspected = 0
+            good = 0
+            defective = 0
 
-            conn = sqlite3.connect(self.db_path)
-            print("✅ DB connected")
+        data = {
+            "job_id": job_id,
+            "inspected": inspected,
+            "good": good,
+            "defective": defective,
+        }
+        return json.dumps(data)
 
-            cursor = conn.cursor()
-            print("✅ cursor created")
-
-            print("✅ before execute")
-            cursor.execute("""
-                SELECT 
-                    COUNT(*) AS inspected,
-                    SUM(CASE WHEN LOWER(result) = 'good' THEN 1 ELSE 0 END) AS good,
-                    SUM(CASE WHEN LOWER(result) = 'bad' THEN 1 ELSE 0 END) AS bad
-                FROM REPORT
-                WHERE job_id = ?
-            """, (job_id,))
-            print("✅ after execute")
-
-            row = cursor.fetchone()
-            print("✅ after fetchone")
-            print("DB row =", row)
-
-            conn.close()
-            print("✅ DB closed")
-
-            inspected = row[0] if row and row[0] is not None else 0
-            good = row[1] if row and row[1] is not None else 0
-            bad = row[2] if row and row[2] is not None else 0
-
-            data = {
-                "job_id": job_id,
-                "inspected": inspected,
-                "good": good,
-                "defective": bad
-            }
-
-            print("Returning counts =", data)
-            return json.dumps(data)
-
-        except Exception as e:
-            print("❌ get_counts error:", e)
-            return json.dumps({
-                "job_id": job_id,
-                "inspected": 0,
-                "good": 0,
-                "defective": 0
-            })
-
-    def load_db_counts_for_job(self, job_id):
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-
-            cursor.execute("""
-                SELECT 
-                    COUNT(*) AS inspected,
-                    SUM(CASE WHEN LOWER(result) = 'good' THEN 1 ELSE 0 END) AS good,
-                    SUM(CASE WHEN LOWER(result) = 'bad' THEN 1 ELSE 0 END) AS bad
-                FROM REPORT
-                WHERE job_id = ?
-            """, (job_id,))
-
-            row = cursor.fetchone()
-            conn.close()
-
-            self.inspected = row[0] if row and row[0] is not None else 0
-            self.good = row[1] if row and row[1] is not None else 0
-            self.bad = row[2] if row and row[2] is not None else 0
-
-            print("✅ DB counts loaded into live counters")
-            print("self.inspected =", self.inspected)
-            print("self.good =", self.good)
-            print("self.bad =", self.bad)
-
-        except Exception as e:
-            print("❌ load_db_counts_for_job error:", e)
-            self.inspected = 0
-            self.good = 0
-            self.bad = 0
+ 
 
     @pyqtSlot(str)
     def saveTrainingSession(self, json_str: str):
@@ -656,6 +684,9 @@ class Bridge(QObject):
                 "message": str(e)
             })
             
+
+
+       
     # Navigation
     @pyqtSlot()
     def goHome(self):
