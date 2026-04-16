@@ -37,16 +37,15 @@ document.addEventListener("DOMContentLoaded", function () {
   renderDefectThumbs();
   // resetToInitialState();
 
-  // const jobIdInput = document.getElementById("jobIdInput");
-  const thresholdInput = document.getElementById("thresholdInput");
+  // // const jobIdInput = document.getElementById("jobIdInput");
+  // const thresholdInput = document.getElementById("thresholdInput");
 
-  // Enable OK button check
-  // jobIdInput.addEventListener("change", checkCanConfirm);
-  thresholdInput.addEventListener("input", checkCanConfirm);
-
-  // Auto-save to userConfig.json on every change (debounced 500 ms)
-  // jobIdInput.addEventListener("change", autoSaveConfig);
-  thresholdInput.addEventListener("input", autoSaveConfig);
+  // if (thresholdInput) {
+  //   thresholdInput.addEventListener("input", checkCanConfirm);
+  //   thresholdInput.addEventListener("input", autoSaveConfig);
+  // } else {
+  //   console.warn("thresholdInput not found");
+  // }
 });
 
 // ── Module: Clock ───────────────────────────────────────────────────
@@ -226,41 +225,44 @@ const Bridge = (() => {
   //    was silently skipped every time.
   //    Solution: wrap in a Promise and use the callback overload.
 
-  function startCamera() {
-    return new Promise((resolve) => {
-      if (!available() || typeof window.bridge.startCamera !== "function") {
-        showCameraModal("Error", "Camera bridge not available");
-        resolve(false);
-        return;
-      }
+  // function startCameras() {
+  //   return new Promise((resolve) => {
+  //     if (!available() || typeof window.bridge.startCamera !== "function") {
+  //       showCameraModal("Error", "Camera bridge not available");
+  //       resolve(false);
+  //       return;
+  //     }
 
-      let responded = false;
+  //     let responded = false;
 
-      try {
-        window.bridge.startCamera(function (result) {
-          responded = true;
+  //     try {
+  //       const result = bridge.startCamera("training");
 
-          if (result === "OK") {
-            resolve(true);
-          } else {
-            showCameraModal("Camera Error", result);
-            resolve(false);
-          }
-        });
+  //       if (responded) return;
 
-        // timeout check
-        setTimeout(() => {
-          if (!responded) {
-            showCameraModal("Timeout", "Camera response not received");
-            resolve(false);
-          }
-        }, 3000);
-      } catch (err) {
-        showCameraModal("Exception", err.message);
-        resolve(false);
-      }
-    });
-  }
+  //       responded = true;
+  //       clearTimeout(timer);
+
+  //       if (result === "OK") {
+  //         resolve(true);
+  //       } else {
+  //         showCameraModal("Camera Error", result);
+  //         resolve(false);
+  //       }
+
+  //       // timeout check
+  //       setTimeout(() => {
+  //         if (!responded) {
+  //           showCameraModal("Timeout", "Camera response not received");
+  //           resolve(false);
+  //         }
+  //       }, 3000);
+  //     } catch (err) {
+  //       showCameraModal("Exception", err.message);
+  //       resolve(false);
+  //     }
+  //   });
+  // }
 
   function stopCamera() {
     if (available() && typeof window.bridge.stopCamera === "function") {
@@ -268,7 +270,7 @@ const Bridge = (() => {
     }
   }
 
-  return { available, sendTrainingSession, startCamera, stopCamera };
+  return { available, sendTrainingSession, stopCamera };
 })();
 
 // ── Module: Camera Control ────────────────────────────────────────────
@@ -345,11 +347,11 @@ const CameraControl = (() => {
   //    which also fails in PyQt5's file:// context — and returned false.
   //    That caused startLive/confirmTraining to bail out early, leaving
   //    the stop button permanently disabled.
-  async function openCamera() {
+  async function openCamera(data) {
     hideFeed(); // reset state
 
     // ── Path 1: PyQt5 bridge (OpenCV) ──────────────────────────────
-    const bridgeOk = await Bridge.startCamera(); // ← was: Bridge.startCamera() (sync, always false)
+    const bridgeOk = await bridge.startCamera(data); // ← was: Bridge.startCamera() (sync, always false)
     if (bridgeOk) {
       usingBridge = true;
       // Frames will arrive via window.receiveFrame() below.
@@ -451,7 +453,7 @@ async function stopCamera() {
   async function startLive() {
     if (activeMode !== null) return;
 
-    const ok = await openCamera();
+    const ok = await openCamera("live_stream");
     if (!ok) return;
 
     activeMode = "live";
@@ -538,7 +540,7 @@ async function stopCamera() {
     // $("jobIdLabel").textContent = jobId;
 
     // Start camera
-    const ok = await openCamera();
+    const ok = await openCamera("training");
     if (!ok) return;
 
     activeMode = "training";
@@ -877,29 +879,22 @@ async function stopTrainingSession() {
 
 document.addEventListener("DOMContentLoaded", () => {
   function restrictInput(el, allowedRegex) {
-    // ✅ LIVE typing validation
+      if (!el) {
+      console.warn("restrictInput target not found");
+      return;
+    }
+
     el.addEventListener("input", () => {
       let value = el.value;
-
-      // remove invalid chars only
       value = value.replace(allowedRegex, "");
-
-      // prevent multiple underscores
       value = value.replace(/_{2,}/g, "_");
-
       el.value = value;
     });
 
-    // ✅ FINAL validation when finished typing
     el.addEventListener("blur", () => {
       let value = el.value;
-
-      // remove starting _
       value = value.replace(/^_+/, "");
-
-      // remove ending _
       value = value.replace(/_+$/, "");
-
       el.value = value;
     });
   }

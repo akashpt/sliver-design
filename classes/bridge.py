@@ -44,6 +44,7 @@ class Bridge(QObject):
         # Frame timer
         self.timer = QTimer()
         self.timer.timeout.connect(self.grab_frame)
+        self.process = None
 
         self.count_time = QTimer()
         self.count_time.timeout.connect(self.count_show)
@@ -185,8 +186,10 @@ class Bridge(QObject):
             return ""
         
    
-    @pyqtSlot(result=str)
-    def startCamera(self):
+    @pyqtSlot(str,result=str)
+    def startCamera(self,process):
+        print(process)
+        self.process = process
         if self.camera_open:
             print("⚠️ Camera already running")
             return "Camera Already Running"
@@ -221,13 +224,16 @@ class Bridge(QObject):
                 return "Camera not available"
 
             print("✅ Using Webcam")
+
         self.camera_open = True
 
-        # Grab one frame immediately so current_frame is ready
-        self.grab_frame()
-
-        # Continue live updates
-        self.timer.start(1000)
+        # # Grab one frame immediately so current_frame is ready
+        # self.grab_frame()
+        if process == "live_stream":
+            self.timer.start(35)
+        else:
+            # Continue live updates
+            self.timer.start(1000)
 
         return "OK"
 
@@ -278,7 +284,6 @@ class Bridge(QObject):
         try:
             frame = None
 
-
             # For testing
             if self.test_image_path:
                 frame = cv2.imread(self.test_image_path)
@@ -323,25 +328,29 @@ class Bridge(QObject):
             # =========================
             self.current_frame = frame.copy()
 
-            if self.training_running and self.training_folder_name:
-                current_time = int(datetime.now().timestamp() * 1000)
+            if self.process == "training":
+                if self.training_running and self.training_folder_name:
+                    current_time = int(datetime.now().timestamp() * 1000)
 
-                if current_time - self.last_training_save_time >= self.training_save_interval:
-                    saved_path = self.save_training_image(
-                        self.current_frame.copy(),
-                        self.training_folder_name
-                    )
+                    if current_time - self.last_training_save_time >= self.training_save_interval:
+                        saved_path = self.save_training_image(
+                            self.current_frame.copy(),
+                            self.training_folder_name
+                        )
 
-                    if saved_path:
-                        print(f"✅ Training image auto-saved: {saved_path}")
-                        self.last_training_save_time = current_time
-                    else:
-                        print("❌ Training image auto-save failed")
+                        if saved_path:
+                            print(f"✅ Training image auto-saved: {saved_path}")
+                            self.last_training_save_time = current_time
+                        else:
+                            print("❌ Training image auto-save failed")
+
             # =========================
             # RUN DETECTION PER FRAME
             # =========================
-            if self.training_running:
+            if self.training_running and self.process == "training":
                 status = "training"
+            elif self.process == "live_stream":
+                status = "live_stream"
             else:
                 status = self.run_detection(frame)
 
@@ -362,7 +371,7 @@ class Bridge(QObject):
                     bad_image_path = save_path
                     
 
-            if not self.training_running:
+            if self.process == "prediction":
                 self.save_report_entry(status, bad_image_path)
 
             

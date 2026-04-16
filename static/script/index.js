@@ -553,7 +553,7 @@ function startDetection() {
 
   if (bridge && typeof bridge.startCamera === "function") {
     try {
-      bridge.startCamera();
+      bridge.startCamera("prediction");
       showToast("✅ Industrial Camera Started via Bridge", 2500);
 
       if (bridge.frame_signal && !bridge.frame_signal._connected) {
