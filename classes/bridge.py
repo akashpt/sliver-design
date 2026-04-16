@@ -334,9 +334,9 @@ class Bridge(QObject):
                 "status": status
             }
 
-            bad_image_path = ""
+            bad_image_path = None
 
-            if status == "bad":
+            if status == "defect" or status == "strip missing":
                 job_id, _ = self.get_job_from_config()
 
                 if job_id:
@@ -510,9 +510,7 @@ class Bridge(QObject):
                 0,
                 0,
                 "",
-                bad_image_path if result_status == "bad" else "",
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                bad_image_path,
             ))
 
             conn.commit()

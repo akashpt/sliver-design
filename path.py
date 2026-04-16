@@ -75,7 +75,7 @@ PREDICTION_IMAGES_DIR = DATA_DIR / "prediction_images"
 USER_CONFIG_FILE = RUN_DIR / "settings.json"
 
 # DATABASE
-DB_FILE = RUN_DIR / "job_id.db"
+DB_FILE = RUN_DIR / "sliver.db"
 
 # MODELS
 MODELS_DIR = RUN_DIR / "models"
