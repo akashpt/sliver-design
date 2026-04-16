@@ -42,10 +42,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (
           (parsed.status === "defect" || parsed.status === "strip missing") &&
-          parsed.defect_path &&
-          currentJobId &&
-          parsed.defect_path.includes("/" + currentJobId + "/")
+          currentJobId
         ) {
+          // alert("checking");
           loadDefectImagesFromBridge();
         }
       });}
@@ -232,7 +231,7 @@ async function loadDefectImagesFromBridge() {
     const raw = await bridge.get_defect_images();
     const parsed = JSON.parse(raw);
 
-    const images = parsed?.images || [];
+    const images = Array.isArray(parsed?.images) ? parsed.images : [];
 
     defectHistory = [];
 
@@ -241,12 +240,11 @@ async function loadDefectImagesFromBridge() {
 
       let imgSrc = src;
 
-      if (
-        !imgSrc.startsWith("http://") &&
-        !imgSrc.startsWith("https://") &&
-        !imgSrc.startsWith("file:///")
-      ) {
-        imgSrc = "file:///" + imgSrc.replace(/\\/g, "/");
+      // Normalize Windows path → file URL
+      imgSrc = imgSrc.replace(/\\/g, "/");
+
+      if (!imgSrc.startsWith("file:///")) {
+        imgSrc = "file:///" + imgSrc;
       }
 
       defectHistory.push({
@@ -255,8 +253,9 @@ async function loadDefectImagesFromBridge() {
       });
     });
 
-    console.log("✅ Defect images loaded:", images.length);
+    console.log("✅ Defect images loaded:", defectHistory.length);
     renderDefectThumbs();
+
   } catch (err) {
     console.error("❌ Failed loading defect images:", err);
   }
@@ -282,9 +281,9 @@ async function loadCountsFromBridge() {
     good = parsed.good || 0;
     bad = parsed.defective || 0;
 
-    console.log("inspected =", inspected);
-    console.log("good =", good);
-    console.log("bad =", bad);
+    // console.log("inspected =", inspected);
+    // console.log("good =", good);
+    // console.log("bad =", bad);
 
     updateCounters();
 
@@ -661,10 +660,10 @@ function setUIState(running) {
 
 // ─── Counters & Uptime ──────────────────────────────────────────────
 function updateCounters() {
-  console.log("🔥 updateCounters called");
-  console.log("setting inspectedCount =", inspected);
-  console.log("setting goodCount =", good);
-  console.log("setting badCount =", bad);
+  // console.log("🔥 updateCounters called");
+  // console.log("setting inspectedCount =", inspected);
+  // console.log("setting goodCount =", good);
+  // console.log("setting badCount =", bad);
 
   document.getElementById("inspectedCount").textContent = inspected ?? 0;
   document.getElementById("goodCount").textContent = good ?? 0;
