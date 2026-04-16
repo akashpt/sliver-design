@@ -41,7 +41,7 @@ document.addEventListener("DOMContentLoaded", function () {
         updateCounters();
 
         if (
-          parsed.status === "bad" &&
+          (parsed.status === "defect" || parsed.status === "strip missing") &&
           parsed.defect_path &&
           currentJobId &&
           parsed.defect_path.includes("/" + currentJobId + "/")
@@ -250,7 +250,7 @@ async function loadDefectImagesFromBridge() {
       }
 
       defectHistory.push({
-        time: new Date().toLocaleTimeString(),
+        time: "",
         src: imgSrc,
       });
     });

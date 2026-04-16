@@ -345,10 +345,10 @@ class Bridge(QObject):
 
                     filename = f"defect_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.jpg"
                     file_path = job_folder / filename
-
+                    save_path = f"{job_id}/{filename}"
                     cv2.imwrite(str(file_path), self.current_frame)
-                    bad_image_path = str(file_path)
-                    counts_data["defect_path"] = bad_image_path
+                    bad_image_path = save_path
+                    counts_data["defect_path"] = str(file_path)
 
             if not self.training_running:
                 self.save_report_entry(status, bad_image_path)
@@ -402,6 +402,9 @@ class Bridge(QObject):
             self.good += 1
         elif status == "defect":
             self.bad += 1
+        else :
+            self.bad +=1
+
 
         # Replace frame with processed image 
         # if processed_img is not None:
@@ -497,11 +500,9 @@ class Bridge(QObject):
                     total_strips,
                     bad_strips,
                     bad_strip_number,
-                    bad_image_path,
-                    created_time,
-                    updated_time
+                    bad_image_path
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 1,
                 "M1",
@@ -546,7 +547,8 @@ class Bridge(QObject):
             latest_10 = image_files[:10]
 
             return json.dumps({
-                "images": [str(p) for p in latest_10]
+                "images": [r"D:\Texa\sliver\sliver-design\Sliver_Data\data\prediction_images\40_cotton_white\defect_20260416_131655_423336.jpg",
+                           r"D:\Texa\sliver\sliver-design\Sliver_Data\data\prediction_images\40_cotton_white\defect_20260416_131655_423336.jpg"]
             })
 
         except Exception as e:

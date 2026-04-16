@@ -18,7 +18,7 @@ def init_db():
             bad_strips INTEGER,
             bad_strip_number TEXT,
             bad_image_path TEXT,
-            created_time TEXTDEFAULT (datetime('now', 'localtime')),
+            created_time TEXT DEFAULT (datetime('now', 'localtime')),
             updated_time TEXT DEFAULT (datetime('now', 'localtime'))
         )
         """)
