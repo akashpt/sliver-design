@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import QApplication  # Only if needed elsewhere
 from classes.mindvision import MindVisionCamera
 from path import *
 from classes.training import StripColorTraining
+from classes.prediction import StripColorPrediction
 
 
 class Bridge(QObject):
@@ -37,6 +38,9 @@ class Bridge(QObject):
         self.training_save_interval = 1000   # milliseconds
         self.last_training_save_time = 0
 
+        self.test_image_path = None
+        self.test_frame = None
+
         # Frame timer
         self.timer = QTimer()
         self.timer.timeout.connect(self.grab_frame)
@@ -50,6 +54,19 @@ class Bridge(QObject):
         # QDir().mkpath(config_dir)
         # self.config_path = os.path.join(config_dir, "userConfig.json")        
         self.config_path= str(USER_CONFIG_FILE)
+
+        # Prediction Class
+        self.detector = StripColorPrediction()
+
+        self.model_key, self.threshold = self.get_job_from_config()
+
+        if self.threshold:
+            self.detector.color_threshold = float(self.threshold)
+
+
+        # For testing
+        # self.test_image_path = r"/home/godzilla/Downloads/sample_sliver.bmp"
+        # self.test_frame = cv2.imread(self.test_image_path)
 
 
     # ====================== CAMERA ======================
@@ -243,10 +260,20 @@ class Bridge(QObject):
         try:
             frame = None
 
+
+            # For testing
+            if self.test_image_path:
+                frame = cv2.imread(self.test_image_path)
+                frame = self.test_frame.copy()
+
+                if frame is None:
+                    print("Test image not found")
+                    return
+
             # =========================
             # MINDVISION CAMERA
             # =========================
-            if self.use_mindvision and self.camera:
+            elif self.use_mindvision and self.camera:
                 frame = self.camera.get_frame()
 
                 if frame is None:
@@ -271,7 +298,7 @@ class Bridge(QObject):
             # =========================
             # 🔥 ROTATE FRAME
             # =========================
-            frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            # frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
             # =========================
             # SAVE CURRENT FRAME
@@ -295,7 +322,10 @@ class Bridge(QObject):
             # =========================
             # RUN DETECTION PER FRAME
             # =========================
-            status = self.run_detection(frame)
+            if self.training_running:
+                status = "training"
+            else:
+                status = self.run_detection(frame)
 
             counts_data = {
                 "inspected": self.inspected,
@@ -320,7 +350,8 @@ class Bridge(QObject):
                     bad_image_path = str(file_path)
                     counts_data["defect_path"] = bad_image_path
 
-            self.save_report_entry(status, bad_image_path)
+            if not self.training_running:
+                self.save_report_entry(status, bad_image_path)
 
             self.counts_signal.emit(json.dumps(counts_data))
 
@@ -346,14 +377,35 @@ class Bridge(QObject):
          # Every frame is inspected
         self.inspected += 1
 
-        is_defect = random.random() < 0.3
+        # is_defect = random.random() < 0.3
 
-        if is_defect:
-            self.bad += 1
-            status = "bad"
-        else:
+        # if is_defect:
+        #     self.bad += 1
+        #     status = "bad"
+        # else:
+        #     self.good += 1
+        #     status = "good"
+
+        # return status
+
+        # Get model + threshold
+        model_key, threshold = self.get_job_from_config()
+
+        if threshold:
+            self.detector.color_threshold = float(threshold)
+
+        # Prediction file function
+        status, processed_img, raw_img, bad_count, bad_indices = self.detector.process_image(frame, model_key)
+
+        # Update counts
+        if status == "good":
             self.good += 1
-            status = "good"
+        elif status == "defect":
+            self.bad += 1
+
+        # Replace frame with processed image 
+        # if processed_img is not None:
+        #     self.current_frame = processed_img
 
         return status
 

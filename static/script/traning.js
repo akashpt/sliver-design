@@ -868,3 +868,48 @@ async function stopTrainingSession() {
     setStatus("Training stop error");
   }
 }
+
+
+
+
+
+// special character restriction for training modal inputs
+
+document.addEventListener("DOMContentLoaded", () => {
+  function restrictInput(el, allowedRegex) {
+    // ✅ LIVE typing validation
+    el.addEventListener("input", () => {
+      let value = el.value;
+
+      // remove invalid chars only
+      value = value.replace(allowedRegex, "");
+
+      // prevent multiple underscores
+      value = value.replace(/_{2,}/g, "_");
+
+      el.value = value;
+    });
+
+    // ✅ FINAL validation when finished typing
+    el.addEventListener("blur", () => {
+      let value = el.value;
+
+      // remove starting _
+      value = value.replace(/^_+/, "");
+
+      // remove ending _
+      value = value.replace(/_+$/, "");
+
+      el.value = value;
+    });
+  }
+
+  // Material
+  restrictInput(document.getElementById("tsCount"), /[^a-zA-Z0-9_]/g);
+
+  // Yarn
+  restrictInput(document.getElementById("tsYarn"), /[^a-zA-Z0-9_]/g);
+
+  // Count
+  restrictInput(document.getElementById("tsColor"), /[^a-zA-Z0-9_]/g);
+});
