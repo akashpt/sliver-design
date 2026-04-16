@@ -45,6 +45,9 @@ class Bridge(QObject):
         self.timer = QTimer()
         self.timer.timeout.connect(self.grab_frame)
 
+        self.count_time = QTimer()
+        self.count_time.timeout.connect(self.count_show)
+        self.count_time.start(1000)
         self.inspected = 0
         self.good = 0
         self.bad = 0
@@ -256,6 +259,21 @@ class Bridge(QObject):
         print("✅ Camera fully stopped")
         # self.insert_report()
 
+    def count_show(self):
+        job_id, _ = self.get_job_from_config()
+        if job_id:
+            self.load_db_counts_for_job(job_id)
+
+
+
+        counts_data = {
+                "inspected": self.inspected,
+                "good": self.good,
+                "bad": self.bad,
+                "status":"defect"
+            }
+        self.counts_signal.emit(json.dumps(counts_data))
+
     def grab_frame(self):
         try:
             frame = None
@@ -327,16 +345,10 @@ class Bridge(QObject):
             else:
                 status = self.run_detection(frame)
 
-            counts_data = {
-                "inspected": self.inspected,
-                "good": self.good,
-                "bad": self.bad,
-                "status": status
-            }
 
-            bad_image_path = ""
+            bad_image_path = None
 
-            if status == "bad":
+            if status == "defect" or status == "strip missing":
                 job_id, _ = self.get_job_from_config()
 
                 if job_id:
@@ -345,15 +357,15 @@ class Bridge(QObject):
 
                     filename = f"defect_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.jpg"
                     file_path = job_folder / filename
-
+                    save_path = f"{job_id}/{filename}"
                     cv2.imwrite(str(file_path), self.current_frame)
-                    bad_image_path = str(file_path)
-                    counts_data["defect_path"] = bad_image_path
+                    bad_image_path = save_path
+                    
 
             if not self.training_running:
                 self.save_report_entry(status, bad_image_path)
 
-            self.counts_signal.emit(json.dumps(counts_data))
+            
 
             # =========================
             # SEND TO UI
@@ -402,6 +414,9 @@ class Bridge(QObject):
             self.good += 1
         elif status == "defect":
             self.bad += 1
+        else :
+            self.bad +=1
+
 
         # Replace frame with processed image 
         # if processed_img is not None:
@@ -497,11 +512,9 @@ class Bridge(QObject):
                     total_strips,
                     bad_strips,
                     bad_strip_number,
-                    bad_image_path,
-                    created_time,
-                    updated_time
+                    bad_image_path
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 1,
                 "M1",
@@ -510,9 +523,7 @@ class Bridge(QObject):
                 0,
                 0,
                 "",
-                bad_image_path if result_status == "bad" else "",
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                bad_image_path,
             ))
 
             conn.commit()
@@ -531,26 +542,34 @@ class Bridge(QObject):
 
             if not job_id:
                 return json.dumps({"images": []})
+            
 
-            job_folder = PREDICTION_IMAGES_DIR / job_id
-            job_folder.mkdir(parents=True, exist_ok=True)
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
 
-            image_files = []
-            for ext in ("*.jpg", "*.jpeg", "*.png", "*.bmp"):
-                image_files.extend(job_folder.glob(ext))
+            cursor.execute("""
+                SELECT bad_image_path
+                FROM REPORT
+                WHERE job_id = ?
+                AND result != 'good'
+                AND bad_image_path IS NOT NULL
+                AND bad_image_path != ''
+                ORDER BY datetime(created_time) DESC
+                LIMIT 10
+            """, (job_id,))
 
-            image_files = sorted(
-                image_files,
-                key=lambda p: p.stat().st_mtime,
-                reverse=True
-            )
+            rows = cursor.fetchall()
+            conn.close()
 
-            latest_10 = image_files[:10]
+            images = []
 
-            return json.dumps({
-                "images": [str(p) for p in latest_10]
-            })
+            for row in rows:
+                path = row[0]
+                full_path = str(PREDICTION_IMAGES_DIR / path)  
+                images.append(full_path)
 
+            return json.dumps({"images": images})
+        
         except Exception as e:
             print("❌ get_defect_images error:", e)
             return json.dumps({"images": []})
@@ -618,7 +637,7 @@ class Bridge(QObject):
                 SELECT 
                     COUNT(*) AS inspected,
                     SUM(CASE WHEN LOWER(result) = 'good' THEN 1 ELSE 0 END) AS good,
-                    SUM(CASE WHEN LOWER(result) = 'bad' THEN 1 ELSE 0 END) AS bad
+                    SUM(CASE WHEN LOWER(result) in ('defect','strip missing') THEN 1 ELSE 0 END) AS bad
                 FROM REPORT
                 WHERE job_id = ?
             """, (job_id,))
@@ -630,10 +649,10 @@ class Bridge(QObject):
             self.good = row[1] if row and row[1] is not None else 0
             self.bad = row[2] if row and row[2] is not None else 0
 
-            print("✅ DB counts loaded into live counters")
-            print("self.inspected =", self.inspected)
-            print("self.good =", self.good)
-            print("self.bad =", self.bad)
+            # print("✅ DB counts loaded into live counters")
+            # print("self.inspected =", self.inspected)
+            # print("self.good =", self.good)
+            # print("self.bad =", self.bad)
 
         except Exception as e:
             print("❌ load_db_counts_for_job error:", e)

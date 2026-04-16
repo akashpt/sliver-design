@@ -18,7 +18,7 @@ def init_db():
             bad_strips INTEGER,
             bad_strip_number TEXT,
             bad_image_path TEXT,
-            created_time TEXT,
+            created_time TEXT DEFAULT (datetime('now', 'localtime')),
             updated_time TEXT DEFAULT (datetime('now', 'localtime'))
         )
         """)
@@ -26,8 +26,8 @@ def init_db():
         conn.commit()
         conn.close()
 
-        print("✅ Database + Tables initialized from app.py")
-        print("📂 DB Path:", DB_FILE)
+        # print("✅ Database + Tables initialized from app.py")
+        # print("📂 DB Path:", DB_FILE)
 
     except Exception as e:
         print("❌ DB Init Error:", e)

@@ -110,7 +110,7 @@ class StripColorPrediction:
         strips = self.detect_horizontal_strips(img)
 
         if len(strips) != self.expected_strip_count:
-            return "error", vis, vis, 0, []
+            return "strip missing", vis, vis, 0, []
 
 
         strip_lab_values = model_data["strip_lab_values"]
