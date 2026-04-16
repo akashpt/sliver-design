@@ -87,6 +87,14 @@ class MainWindow(QMainWindow):
         view = QWebEngineView()
         self.report_window.setCentralWidget(view)
 
+        # ✅ Attach bridge to report window also
+        report_channel = QWebChannel()
+        report_channel.registerObject("bridge", self.bridge)
+        view.page().setWebChannel(report_channel)
+
+        # keep reference
+        self.report_channel = report_channel
+
         report_file = (REPORT_PAGE).resolve()
 
         if report_file.exists():

@@ -11,7 +11,7 @@ from classes.mindvision import MindVisionCamera
 from path import *
 from classes.training import StripColorTraining
 from classes.prediction import StripColorPrediction
-
+from classes.report import ReportManager
 
 class Bridge(QObject):
 
@@ -708,6 +708,22 @@ class Bridge(QObject):
                 "message": str(e)
             })
             
+    
+    @pyqtSlot(result=str)
+    def get_report_summary(self):
+        try:
+            manager = ReportManager()
+            return manager.get_summary_json()
+        except Exception as e:
+            print("❌ get_report_summary bridge error:", e)
+            return json.dumps({
+                "ok": False,
+                "total": 0,
+                "good": 0,
+                "defective": 0,
+                "message": str(e)
+            })
+
     # Navigation
     @pyqtSlot()
     def goHome(self):
