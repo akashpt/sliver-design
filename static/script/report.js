@@ -1,4 +1,124 @@
-// Date
+// ─────────────────────────────────────────────
+//  Signal / Slot  (lightweight event bus)
+// ─────────────────────────────────────────────
+class Signal {
+  constructor() {
+    this._slots = [];
+  }
+  /** Connect a slot function to this signal */
+  connect(slot) {
+    this._slots.push(slot);
+  }
+  /** Emit the signal — every connected slot is called with data */
+  emit(data) {
+    this._slots.forEach((slot) => slot(data));
+  }
+}
+// Initialize QWebChannel, then trigger the first fetch
+document.addEventListener("DOMContentLoaded", () => {
+  new QWebChannel(qt.webChannelTransport, function (channel) {
+    window.bridge = channel.objects.bridge;   // expose globally
+    filterSignal.emit({ period: "day" });     // now safe to fire
+  });
+});
+// ─────────────────────────────────────────────
+//  Signals
+// ─────────────────────────────────────────────
+
+/** Fired whenever the user clicks a Day / Week / Month button.
+ *  Payload: { period: 'day' | 'week' | 'month' } */
+const filterSignal = new Signal();
+
+/** Fired after the bridge returns fresh counts.
+ *  Payload: { inspected, good, defective, rate, period } */
+const metricsSignal = new Signal();
+
+// ─────────────────────────────────────────────
+//  Period → human-readable label map
+// ─────────────────────────────────────────────
+const PERIOD_LABELS = {
+  day:   "Last 24 hours",
+  week:  "Last 7 days",
+  month: "This month",
+};
+
+const PERIOD_SUB = {
+  day:   "units today",
+  week:  "units this week",
+  month: "units this month",
+};
+
+// ─────────────────────────────────────────────
+//  Slot: call bridge → emit metricsSignal
+// ─────────────────────────────────────────────
+function slotFetchMetrics({ period }) {
+  if (!window.bridge) {
+    console.warn("Bridge not ready");
+    return;
+  }
+
+  bridge.get_counts_by_range(period, function (raw) {   // ← callback
+    try {
+      const data = JSON.parse(raw);
+      if (!data.ok) {
+        console.warn("Bridge returned error:", data.message);
+        return;
+      }
+      metricsSignal.emit(data);
+    } catch (e) {
+      console.error("slotFetchMetrics parse error:", e);
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+//  Slot: update DOM from metricsSignal payload
+// ─────────────────────────────────────────────
+function slotUpdateMetricCards({ period, inspected, good, defective, rate }) {
+  const fmt = (n) => n.toLocaleString("en-IN");
+
+  document.getElementById("mcInspected").textContent    = fmt(inspected);
+  document.getElementById("mcGood").textContent         = fmt(good);
+  document.getElementById("mcDefective").textContent    = fmt(defective);
+  document.getElementById("mcRate").textContent         = rate.toFixed(1) + "%";
+  document.getElementById("mcInspectedSub").textContent = PERIOD_SUB[period] ?? "units";
+  document.getElementById("activePeriodLabel").textContent = PERIOD_LABELS[period] ?? period;
+
+  // Keep donut chart in sync
+  if (window._donutChart) {
+    window._donutChart.data.datasets[0].data = [good, defective];
+    window._donutChart.update();
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Wire signals → slots
+// ─────────────────────────────────────────────
+filterSignal.connect(slotFetchMetrics);     // button click → bridge call
+metricsSignal.connect(slotUpdateMetricCards); // bridge result → DOM update
+ 
+// ─────────────────────────────────────────────
+//  Filter button wiring (DOM → Signal)
+// ─────────────────────────────────────────────
+document.getElementById("filterGroup")
+  .addEventListener("click", (e) => {
+    const btn = e.target.closest(".filter-btn");
+    if (!btn) return;
+
+    const period = btn.dataset.period;
+
+    // Toggle active state
+    document.querySelectorAll(".filter-btn").forEach((b) =>
+      b.classList.toggle("active", b === btn)
+    );
+
+    // Fire the signal
+    filterSignal.emit({ period });
+  });
+
+// ─────────────────────────────────────────────
+//  Date label
+// ─────────────────────────────────────────────
 document.getElementById("reportDate").textContent =
   new Date().toLocaleDateString("en-IN", {
     day: "numeric",
@@ -8,12 +128,14 @@ document.getElementById("reportDate").textContent =
     minute: "2-digit",
   });
 
-// Chart global defaults
+// ─────────────────────────────────────────────
+//  Chart global defaults
+// ─────────────────────────────────────────────
 Chart.defaults.font.family = "Inter, sans-serif";
 Chart.defaults.font.size = 11;
 Chart.defaults.color = "#9ca3af";
 
-const C_RED = "#c0202e";
+const C_RED   = "#c0202e";
 const C_GREEN = "#16a34a";
 const gridCol = "#f3f4f6";
 
@@ -21,20 +143,7 @@ const gridCol = "#f3f4f6";
 new Chart(document.getElementById("chartLine"), {
   type: "line",
   data: {
-    labels: [
-      "00",
-      "02",
-      "04",
-      "06",
-      "08",
-      "10",
-      "12",
-      "14",
-      "16",
-      "18",
-      "20",
-      "22",
-    ],
+    labels: ["00","02","04","06","08","10","12","14","16","18","20","22"],
     datasets: [
       {
         label: "Defects",
@@ -69,8 +178,8 @@ new Chart(document.getElementById("chartLine"), {
   },
 });
 
-// ── Doughnut ──
-new Chart(document.getElementById("chartDonut"), {
+// ── Doughnut  (kept in window so metricsSignal can update it) ──
+window._donutChart = new Chart(document.getElementById("chartDonut"), {
   type: "doughnut",
   data: {
     labels: ["Good", "Defective"],
@@ -106,13 +215,7 @@ new Chart(document.getElementById("chartDonut"), {
 new Chart(document.getElementById("chartBar"), {
   type: "bar",
   data: {
-    labels: [
-      "Sliver Mark",
-      "Surface Scratch",
-      "Edge Dent",
-      "Oil Stain",
-      "Crack",
-    ],
+    labels: ["Sliver Mark","Surface Scratch","Edge Dent","Oil Stain","Crack"],
     datasets: [
       {
         label: "Occurrences",
@@ -145,37 +248,9 @@ new Chart(document.getElementById("chartBar"), {
   },
 });
 
-// ── Table ──
-const rows = [
-  ["0248", "22:41:03", "Camera 1", "Sliver Mark", "96.2%", "bad"],
-  ["0247", "22:38:51", "Camera 0", "—", "98.8%", "good"],
-  ["0246", "22:35:22", "Camera 0", "—", "99.1%", "good"],
-  ["0245", "22:31:14", "Camera 1", "Surface Scratch", "91.4%", "bad"],
-  ["0244", "22:28:09", "Camera 0", "—", "97.7%", "good"],
-  ["0243", "22:22:50", "Camera 1", "Edge Dent", "88.9%", "bad"],
-  ["0242", "22:19:33", "Camera 0", "—", "99.3%", "good"],
-  ["0241", "22:14:07", "Camera 0", "—", "98.0%", "good"],
-  ["0240", "22:11:42", "Camera 1", "Oil Stain", "93.5%", "bad"],
-  ["0239", "22:07:18", "Camera 0", "—", "97.2%", "good"],
-];
-const tbody = document.getElementById("tBody");
-rows.forEach((r) => {
-  const isGood = r[5] === "good";
-  tbody.innerHTML += `
-      <tr>
-        <td class="mono" style="color:var(--gray-400)">#${r[0]}</td>
-        <td class="mono">${r[1]}</td>
-        <td>${r[2]}</td>
-        <td>${r[3]}</td>
-        <td class="mono">${r[4]}</td>
-        <td>
-          <span class="pill ${r[5]}">
-            <i class="fas fa-${isGood ? "check" : "xmark"}" style="font-size:.6rem;"></i>
-            ${isGood ? "Good" : "Defective"}
-          </span>
-        </td>
-      </tr>`;
-});
+// ─────────────────────────────────────────────
+//  Toast
+// ─────────────────────────────────────────────
 function showToast(msg, ms = 3000) {
   const t = document.getElementById("toast");
   document.getElementById("toastMsg").textContent = msg;
@@ -186,3 +261,10 @@ function showToast(msg, ms = 3000) {
     setTimeout(() => (t.style.display = "none"), 300);
   }, ms);
 }
+
+// ─────────────────────────────────────────────
+//  On load: trigger default filter (Day)
+// ─────────────────────────────────────────────
+// window.addEventListener("DOMContentLoaded", () => {
+//   filterSignal.emit({ period: "day" });
+// });

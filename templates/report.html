@@ -6,8 +6,8 @@
     <title>Report — Sliver Strip Detection</title>
 
     <link rel="stylesheet" href="../static/css/all.min.css" />
- 
     <link rel="stylesheet" href="../static/css/report.css" />
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
   </head>
 
   <body>
@@ -22,18 +22,6 @@
         <div class="brand-name">Sliver Strip Detection</div>
         <div class="brand-sub">Industrial Vision System</div>
       </div>
-      <!-- <div class="hdr-right">
-        <div class="hdr-chip">
-          <i
-            class="fas fa-file-chart-line"
-            style="font-size: 0.7rem; opacity: 0.7"
-          ></i>
-          Report
-        </div>
-        <button class="back-btn" onclick="window.location.href = 'index.html'">
-          <i class="fas fa-arrow-left"></i> Dashboard
-        </button>
-      </div> -->
     </header>
 
     <div class="layout">
@@ -44,11 +32,20 @@
           <div class="top-bar-left">
             <h1>Inspection Report</h1>
             <p>
-              <i class="fas fa-clock" style="font-size: 0.65rem"></i> Last 24
-              hours &nbsp;·&nbsp; <span id="reportDate"></span>
+              <i class="fas fa-clock" style="font-size: 0.65rem"></i>
+              <span id="activePeriodLabel">Last 24 hours</span>
+              &nbsp;·&nbsp;
+              <span id="reportDate"></span>
             </p>
           </div>
           <div class="top-bar-right">
+            <!-- ── FILTER BUTTONS ── -->
+            <div class="filter-group" id="filterGroup">
+              <button class="filter-btn active" data-period="day">Day</button>
+              <button class="filter-btn" data-period="week">Week</button>
+              <button class="filter-btn" data-period="month">Month</button>
+            </div>
+
             <button
               class="btn-outline"
               onclick="showToast('Refreshing data...', 2000)"
@@ -69,25 +66,25 @@
           <div class="mc t-default">
             <div class="mc-icon"><i class="fas fa-boxes-stacked"></i></div>
             <div class="mc-label">Total Inspected</div>
-            <div class="mc-val">1,248</div>
-            <div class="mc-sub">units today</div>
+            <div class="mc-val" id="mcInspected">-</div>
+            <div class="mc-sub" id="mcInspectedSub">units today</div>
           </div>
           <div class="mc t-green">
             <div class="mc-icon"><i class="fas fa-check"></i></div>
             <div class="mc-label">Good Units</div>
-            <div class="mc-val g">1,187</div>
+            <div class="mc-val g" id="mcGood">-</div>
             <div class="mc-sub">passed QC</div>
           </div>
           <div class="mc t-red">
             <div class="mc-icon"><i class="fas fa-xmark"></i></div>
             <div class="mc-label">Defective</div>
-            <div class="mc-val r">61</div>
+            <div class="mc-val r" id="mcDefective">-</div>
             <div class="mc-sub">rejected</div>
           </div>
           <div class="mc t-amber">
             <div class="mc-icon"><i class="fas fa-percent"></i></div>
             <div class="mc-label">Defect Rate</div>
-            <div class="mc-val a">4.9%</div>
+            <div class="mc-val a" id="mcRate">-</div>
             <div class="mc-sub">of total</div>
           </div>
         </div>
@@ -137,8 +134,6 @@
             <canvas id="chartBar"></canvas>
           </div>
         </div>
-
-        <!-- TABLE -->
       </div>
       <!-- /content -->
     </div>
@@ -146,6 +141,7 @@
 
     <!-- TOAST -->
     <div id="toast" class="toast"><span id="toastMsg"></span></div>
+
     <script src="../static/script/chart.umd.min.js"></script>
     <script src="../static/script/report.js"></script>
   </body>

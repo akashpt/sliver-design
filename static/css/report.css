@@ -1,5 +1,4 @@
-   
-    @font-face {
+@font-face {
   font-family: "Inter";
   src: url("../fonts/Inter-Regular.woff2") format("woff2");
   font-weight: 400;
@@ -606,3 +605,39 @@
         background: #555;
       }
  
+/* ─── FILTER BUTTONS ─── */
+.filter-group {
+  display: flex;
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 3px;
+  margin-right: 10px;
+  gap: 2px;
+}
+
+.filter-btn {
+  background: transparent;
+  border: none;
+  color: var(--gray-400);
+  padding: 5px 14px;
+  border-radius: 6px;
+  font-family: "Inter", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+  white-space: nowrap;
+}
+
+.filter-btn:hover {
+  color: var(--gray-600);
+  background: var(--white);
+}
+
+.filter-btn.active {
+  background: var(--white);
+  color: var(--primary);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+}
