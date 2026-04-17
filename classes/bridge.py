@@ -756,13 +756,10 @@ class Bridge(QObject):
     @pyqtSlot(str, result=str)
     def get_counts_by_range(self, period):
         """
-        Slot called from JS filter buttons.
         period: 'day' | 'week' | 'month'
-        Queries REPORT table filtered by created_time using SQLite date functions.
-        Emits result as JSON so JS can update metric cards.
+        Returns cards + donut/bar + line chart data
         """
         try:
-            # Map period to SQLite date modifier
             date_filter_map = {
                 "day": "date(created_time) = date('now', 'localtime')",
                 "week": "date(created_time) >= date('now', '-6 days', 'localtime')",
@@ -770,31 +767,115 @@ class Bridge(QObject):
             }
 
             if period not in date_filter_map:
-                return json.dumps({"ok": False, "message": f"Unknown period: {period}"})
+                return json.dumps({
+                    "ok": False,
+                    "message": f"Unknown period: {period}"
+                })
 
             date_condition = date_filter_map[period]
 
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
 
+            # cards
             cursor.execute(
                 f"""
                 SELECT
                     COUNT(*) AS inspected,
-                    SUM(CASE WHEN LOWER(result) = 'good' THEN 1 ELSE 0 END) AS good,
-                    SUM(CASE WHEN LOWER(result) IN ('defect', 'bad', 'strip missing') THEN 1 ELSE 0 END) AS bad
+                    SUM(CASE WHEN LOWER(COALESCE(result, '')) = 'good' THEN 1 ELSE 0 END) AS good,
+                    SUM(CASE WHEN LOWER(COALESCE(result, '')) IN ('defect', 'bad', 'strip missing') THEN 1 ELSE 0 END) AS bad
                 FROM REPORT
                 WHERE {date_condition}
-            """
+                """
             )
-
             row = cursor.fetchone()
-            conn.close()
 
             inspected = row[0] if row and row[0] is not None else 0
             good = row[1] if row and row[1] is not None else 0
             bad = row[2] if row and row[2] is not None else 0
             rate = round((bad / inspected) * 100, 1) if inspected > 0 else 0.0
+
+            # bar chart
+            breakdown_labels = ["Good", "Defective"]
+            breakdown_values = [good, bad]
+
+            # line chart
+            if period == "day":
+                hourly_labels = [f"{h:02d}" for h in range(24)]
+                hourly_values = [0] * 24
+
+                cursor.execute(
+                    f"""
+                    SELECT
+                        strftime('%H', created_time) AS hour_label,
+                        COUNT(*) AS total
+                    FROM REPORT
+                    WHERE {date_condition}
+                    AND LOWER(COALESCE(result, '')) IN ('defect', 'bad', 'strip missing')
+                    GROUP BY strftime('%H', created_time)
+                    ORDER BY hour_label
+                    """
+                )
+
+                for hour_label, total in cursor.fetchall():
+                    if hour_label is not None:
+                        hourly_values[int(hour_label)] = total
+
+            elif period == "week":
+                hourly_labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+                hourly_values = [0] * 7
+
+                cursor.execute(
+                    f"""
+                    SELECT
+                        strftime('%w', created_time) AS day_no,
+                        COUNT(*) AS total
+                    FROM REPORT
+                    WHERE {date_condition}
+                    AND LOWER(COALESCE(result, '')) IN ('defect', 'bad', 'strip missing')
+                    GROUP BY strftime('%w', created_time)
+                    ORDER BY day_no
+                    """
+                )
+
+                sqlite_to_idx = {
+                    "1": 0,  # Mon
+                    "2": 1,
+                    "3": 2,
+                    "4": 3,
+                    "5": 4,
+                    "6": 5,
+                    "0": 6,  # Sun
+                }
+
+                for day_no, total in cursor.fetchall():
+                    if day_no in sqlite_to_idx:
+                        hourly_values[sqlite_to_idx[day_no]] = total
+
+            else:  # month
+                hourly_labels = [str(i) for i in range(1, 32)]
+                hourly_values = [0] * 31
+
+                cursor.execute(
+                    f"""
+                    SELECT
+                        strftime('%d', created_time) AS day_label,
+                        COUNT(*) AS total
+                    FROM REPORT
+                    WHERE {date_condition}
+                    AND LOWER(COALESCE(result, '')) IN ('defect', 'bad', 'strip missing')
+                    GROUP BY strftime('%d', created_time)
+                    ORDER BY day_label
+                    """
+                )
+
+                for day_label, total in cursor.fetchall():
+                    if day_label is not None:
+                        idx = int(day_label) - 1
+                        if 0 <= idx < 31:
+                            hourly_values[idx] = total
+
+            conn.close()
 
             data = {
                 "ok": True,
@@ -803,6 +884,14 @@ class Bridge(QObject):
                 "good": good,
                 "defective": bad,
                 "rate": rate,
+                "breakdown": {
+                    "labels": breakdown_labels,
+                    "values": breakdown_values
+                },
+                "line_chart": {
+                    "labels": hourly_labels,
+                    "values": hourly_values
+                }
             }
 
             print(f"✅ get_counts_by_range [{period}] →", data)
@@ -810,18 +899,23 @@ class Bridge(QObject):
 
         except Exception as e:
             print("❌ get_counts_by_range error:", e)
-            return json.dumps(
-                {
-                    "ok": False,
-                    "period": period,
-                    "inspected": 0,
-                    "good": 0,
-                    "defective": 0,
-                    "rate": 0.0,
-                    "message": str(e),
-                }
-            )
-
+            return json.dumps({
+                "ok": False,
+                "period": period,
+                "inspected": 0,
+                "good": 0,
+                "defective": 0,
+                "rate": 0.0,
+                "breakdown": {
+                    "labels": ["Good", "Defective"],
+                    "values": [0, 0]
+                },
+                "line_chart": {
+                    "labels": [],
+                    "values": []
+                },
+                "message": str(e),
+            })
     # ====================== REPORT SUMMARY End ======================
 
     # Navigation
