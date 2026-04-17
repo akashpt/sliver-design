@@ -11,7 +11,7 @@ from classes.mindvision import MindVisionCamera
 from path import *
 from classes.training import StripColorTraining
 from classes.prediction import StripColorPrediction
-from classes.report import ReportManager
+# from classes.report import ReportManager
 
 class Bridge(QObject):
 
@@ -28,7 +28,7 @@ class Bridge(QObject):
         print("DB Path:", self.db_path)            # create table automatically
 
         # Camera
-        self.camera = None
+        self.camera = None  
         self.cap = None
         self.use_mindvision = False
         self.camera_open = False
@@ -737,20 +737,92 @@ class Bridge(QObject):
             })
             
     
-    @pyqtSlot(result=str)
-    def get_report_summary(self):
+    # @pyqtSlot(result=str)
+    # def get_report_summary(self):
+    #     try:
+    #         manager = ReportManager()
+    #         return manager.get_summary_json()
+    #     except Exception as e:
+    #         print("❌ get_report_summary bridge error:", e)
+    #         return json.dumps({
+    #             "ok": False,
+    #             "total": 0,
+    #             "good": 0,
+    #             "defective": 0,
+    #             "message": str(e)
+    #         })
+
+    # ====================== REPORT SUMMARY Start======================
+    @pyqtSlot(str, result=str)
+    def get_counts_by_range(self, period):
+        """
+        Slot called from JS filter buttons.
+        period: 'day' | 'week' | 'month'
+        Queries REPORT table filtered by created_time using SQLite date functions.
+        Emits result as JSON so JS can update metric cards.
+        """
         try:
-            manager = ReportManager()
-            return manager.get_summary_json()
+            # Map period to SQLite date modifier
+            date_filter_map = {
+                "day": "date(created_time) = date('now', 'localtime')",
+                "week": "date(created_time) >= date('now', '-6 days', 'localtime')",
+                "month": "date(created_time) >= date('now', 'start of month', 'localtime')",
+            }
+
+            if period not in date_filter_map:
+                return json.dumps({"ok": False, "message": f"Unknown period: {period}"})
+
+            date_condition = date_filter_map[period]
+
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            cursor.execute(
+                f"""
+                SELECT
+                    COUNT(*) AS inspected,
+                    SUM(CASE WHEN LOWER(result) = 'good' THEN 1 ELSE 0 END) AS good,
+                    SUM(CASE WHEN LOWER(result) IN ('defect', 'bad', 'strip missing') THEN 1 ELSE 0 END) AS bad
+                FROM REPORT
+                WHERE {date_condition}
+            """
+            )
+
+            row = cursor.fetchone()
+            conn.close()
+
+            inspected = row[0] if row and row[0] is not None else 0
+            good = row[1] if row and row[1] is not None else 0
+            bad = row[2] if row and row[2] is not None else 0
+            rate = round((bad / inspected) * 100, 1) if inspected > 0 else 0.0
+
+            data = {
+                "ok": True,
+                "period": period,
+                "inspected": inspected,
+                "good": good,
+                "defective": bad,
+                "rate": rate,
+            }
+
+            print(f"✅ get_counts_by_range [{period}] →", data)
+            return json.dumps(data)
+
         except Exception as e:
-            print("❌ get_report_summary bridge error:", e)
-            return json.dumps({
-                "ok": False,
-                "total": 0,
-                "good": 0,
-                "defective": 0,
-                "message": str(e)
-            })
+            print("❌ get_counts_by_range error:", e)
+            return json.dumps(
+                {
+                    "ok": False,
+                    "period": period,
+                    "inspected": 0,
+                    "good": 0,
+                    "defective": 0,
+                    "rate": 0.0,
+                    "message": str(e),
+                }
+            )
+
+    # ====================== REPORT SUMMARY End ======================
 
     # Navigation
     @pyqtSlot()

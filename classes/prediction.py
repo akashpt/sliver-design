@@ -16,7 +16,6 @@ class StripColorPrediction:
         self.expected_strip_count = 8
         self.minimum_strip_gap = 35
         self.center_crop_percent = 0.25
-
         self.color_threshold = color_threshold
 
     # ---------------- LOAD MODEL ----------------
@@ -35,6 +34,7 @@ class StripColorPrediction:
             return json.load(f)
 
     # ---------------- DETECT STRIPS ----------------
+
     def detect_horizontal_strips(self, image):
 
         height, width = image.shape[:2]
@@ -58,7 +58,7 @@ class StripColorPrediction:
         sorted_rows = np.argsort(projection)[::-1]
         strip_centers = []
 
-        for y in sorted_rows:
+        for y in sorted_rows:  
             if projection[y] < 0.55 * np.max(projection):
                 break
 
