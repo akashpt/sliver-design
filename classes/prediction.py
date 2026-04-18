@@ -21,17 +21,20 @@ class StripColorPrediction:
     # ---------------- LOAD MODEL ----------------
 
     def load_model(self, model_key):
+        try:
         
-        model_path = MODELS_DIR / model_key / f"{model_key}.json"
+            model_path = MODELS_DIR / model_key / f"{model_key}.json"
 
-        if not model_path.exists():
-            model_path = MODELS_DIR / model_key
+            if not model_path.exists():
+                model_path = MODELS_DIR / model_key
 
-        if not model_path.exists():
-            return None
+            if not model_path.exists():
+                return None
 
-        with open(model_path, "r") as f:
-            return json.load(f)
+            with open(model_path, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            print("Load Model Error :",e)
 
     # ---------------- DETECT STRIPS ----------------
 

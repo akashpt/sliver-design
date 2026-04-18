@@ -68,8 +68,8 @@ class Bridge(QObject):
             self.detector.color_threshold = float(self.threshold)
 
 
-        # For testing
-        # self.test_image_path = r"/home/godzilla/Downloads/sample_sliver.bmp"
+        # # For testing
+        # self.test_image_path = r"/home/texa/Aarthy_data/sliver-design/imgs/good/img_0001.bmp"
         # self.test_frame = cv2.imread(self.test_image_path)
 
 
@@ -188,7 +188,6 @@ class Bridge(QObject):
    
     @pyqtSlot(str,result=str)
     def startCamera(self,process):
-        print(process)
         self.process = process
         if self.camera_open:
             print("⚠️ Camera already running")
@@ -284,19 +283,19 @@ class Bridge(QObject):
         try:
             frame = None
 
-            # For testing
-            if self.test_image_path:
-                frame = cv2.imread(self.test_image_path)
-                frame = self.test_frame.copy()
+            # # For testing
+            # if self.test_image_path:
+            #     frame = cv2.imread(self.test_image_path)
+            #     frame = self.test_frame.copy()
 
-                if frame is None:
-                    print("Test image not found")
-                    return
+            #     if frame is None:
+            #         print("Test image not found")
+            #         return
 
             # =========================
             # MINDVISION CAMERA
             # =========================
-            elif self.use_mindvision and self.camera:
+            if self.use_mindvision and self.camera:
                 frame = self.camera.get_frame()
 
                 if frame is None:
@@ -323,7 +322,7 @@ class Bridge(QObject):
             # =========================
             # frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
-            # =========================
+            # =========================defect_path
             # SAVE CURRENT FRAME
             # =========================
             self.current_frame = frame.copy()
@@ -347,6 +346,7 @@ class Bridge(QObject):
             # =========================
             # RUN DETECTION PER FRAME
             # =========================
+            processed_img = None
             if self.training_running and self.process == "training":
                 status = "training"
             elif self.process == "live_stream":
@@ -367,14 +367,22 @@ class Bridge(QObject):
                     filename = f"defect_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.jpg"
                     file_path = job_folder / filename
                     save_path = f"{job_id}/{filename}"
-                    cv2.imwrite(str(file_path), self.current_frame)
+                    saved = cv2.imwrite(str(file_path), self.current_frame)
                     bad_image_path = save_path
-                    
+
+
+                    if saved:
+                        from classes.send_mail import send_email_with_attachments
+                        import threading
+                        threading.Thread(
+                            target=send_email_with_attachments,
+                            args=(str(file_path),)
+                            daemon=True
+                        ).start()
+                        print(f"Saved: {file_path}")
 
             if self.process == "prediction":
                 self.save_report_entry(status, bad_image_path)
-
-            
 
             # =========================
             # SEND TO UI
@@ -431,7 +439,7 @@ class Bridge(QObject):
         # if processed_img is not None:
         #     self.current_frame = processed_img
 
-        return status
+        return status,processed_img
 
     def get_model_job_ids(self):
         try:
@@ -586,9 +594,9 @@ class Bridge(QObject):
     @pyqtSlot(str, result=str)
     def get_counts(self, job_id):
         try:
-            print("🔥 get_counts CALLED")
-            print("job_id from UI =", job_id)
-            print("db_path =", self.db_path)
+            # print("🔥 get_counts CALLED")
+            # print("job_id from UI =", job_id)
+            # print("db_path =", self.db_path)
 
             conn = sqlite3.connect(self.db_path)
             print("✅ DB connected")
@@ -608,11 +616,11 @@ class Bridge(QObject):
             print("✅ after execute")
 
             row = cursor.fetchone()
-            print("✅ after fetchone")
-            print("DB row =", row)
+            # print("✅ after fetchone")
+            # print("DB row =", row)
 
-            conn.close()
-            print("✅ DB closed")
+            # conn.close()
+            # print("✅ DB closed")
 
             inspected = row[0] if row and row[0] is not None else 0
             good = row[1] if row and row[1] is not None else 0
