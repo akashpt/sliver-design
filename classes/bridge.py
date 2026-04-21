@@ -134,6 +134,17 @@ class Bridge(QObject):
             with open(self.config_path, "w", encoding="utf-8") as f:
                 json.dump(empty_config, f, indent=2)
 
+            self.inspected = 0
+            self.good = 0
+            self.bad = 0
+
+            self.counts_signal.emit(json.dumps({
+                "inspected": 0,
+                "good": 0,
+                "bad": 0,
+                "status": "reset"
+            }))
+
             print("Config reset successfully")
 
         except Exception as e:
@@ -270,17 +281,22 @@ class Bridge(QObject):
 
     def count_show(self):
         job_id, _ = self.get_job_from_config()
+
         if job_id:
             self.load_db_counts_for_job(job_id)
+        else:
+            self.inspected = 0
+            self.good = 0
+            self.bad = 0
 
         self.get_system_storage()
 
         counts_data = {
-                "inspected": self.inspected,
-                "good": self.good,
-                "bad": self.bad,
-                "status":"defect"
-            }
+            "inspected": self.inspected,
+            "good": self.good,
+            "bad": self.bad,
+            "status": "defect"
+        }
         self.counts_signal.emit(json.dumps(counts_data))
 
     def grab_frame(self):

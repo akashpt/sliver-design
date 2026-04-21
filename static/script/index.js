@@ -374,23 +374,25 @@ function confirmConfig() {
 
   currentJobId = jobId;
   currentThreshold = threshold;
+
   saveUserConfigToBridge(jobId, threshold);
+
+  // ✅ When OK clicked, load counts based on selected job id
+  loadCountsFromBridge();
+
   loadDefectImagesFromBridge();
   document.getElementById("jobIdLabel").textContent = jobId;
 
-  // Lock both inputs after confirmation
   const jobSelect = document.getElementById("jobIdInput");
   const thresholdInput = document.getElementById("thresholdInput");
 
   jobSelect.disabled = true;
   jobSelect.style.opacity = "0.6";
   jobSelect.style.cursor = "not-allowed";
+
   thresholdInput.disabled = true;
   thresholdInput.style.opacity = "0.6";
   thresholdInput.style.cursor = "not-allowed";
-
-  // Persist confirmed values immediately (no debounce)
-  // writeUserConfig(jobId, threshold);
 
   showToast(
     `✅ Configuration Confirmed!<br>Job: ${jobId} | Threshold: ${threshold}`,
@@ -413,9 +415,17 @@ function resetConfig() {
   thresholdInput.value = "";
   currentJobId = "";
   currentThreshold = "";
+
+  // ✅ Reset counts to 0 when Reset clicked
+  inspected = 0;
+  good = 0;
+  bad = 0;
+  updateCounters();
+
   defectHistory = [];
   currentModalIndex = -1;
   renderDefectThumbs();
+
   document.getElementById("jobIdLabel").textContent = "—";
 
   jobSelect.disabled = false;
