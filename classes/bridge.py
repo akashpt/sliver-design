@@ -454,17 +454,6 @@ class Bridge(QObject):
          # Every frame is inspected
         self.inspected += 1
 
-        # is_defect = random.random() < 0.3
-
-        # if is_defect:
-        #     self.bad += 1
-        #     status = "bad"
-        # else:
-        #     self.good += 1
-        #     status = "good"
-
-        # return status
-
         # Get model + threshold
         model_key, threshold = self.get_job_from_config()
 

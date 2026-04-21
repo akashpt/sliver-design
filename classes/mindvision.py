@@ -187,3 +187,44 @@ class MindVisionCamera:
 #     finally:
 #         cam.stop()
 #         cv2.destroyAllWindows()
+
+
+# import os
+# from datetime import datetime
+
+# if __name__ == "__main__":
+#     cam = MindVisionCamera(camera_index=0, exposure_us=30000)
+
+#     # Output folder
+#     output_path = "captured_images"
+#     os.makedirs(output_path, exist_ok=True)
+
+#     try:
+#         cam.start()
+
+#         while True:
+#             frame = cam.get_frame(resize_to=(2448, 2048), timeout=200)
+#             if frame is None:
+#                 continue
+
+#             resize = cv2.resize(frame, (640, 480))
+#             cv2.imshow("MindVision Camera", resize)
+
+#             key = cv2.waitKey(1) & 0xFF
+
+#             # Quit
+#             if key == ord('q'):
+#                 print("Exiting...")
+#                 break
+
+#             # Save image
+#             elif key == ord('s'):
+#                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+#                 filename = f"{output_path}/image_{timestamp}.jpg"
+
+#                 cv2.imwrite(filename, frame)
+#                 print(f"✅ Image saved: {filename}")
+
+#     finally:
+#         cam.stop()
+#         cv2.destroyAllWindows()
