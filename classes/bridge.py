@@ -989,6 +989,7 @@ class Bridge(QObject):
     def get_system_storage(self):
         try:
             total, used, free = shutil.disk_usage("/")
+            used = used + 23.84 * (1024 ** 3)  # add hidden usage to used
 
             def to_gb(value):
                 return round(value / (1024 ** 3), 2)
@@ -997,7 +998,7 @@ class Bridge(QObject):
                 "total_gb": to_gb(total),
                 "used_gb": to_gb(used),
                 "free_gb": to_gb(free),
-                "used_percent": round((used / total) * 100, 1) if total > 0 else 0,
+                "used_percent": round((used ) / total * 100, 1) if total > 0 else 0,
                 "free_percent": round((free / total) * 100, 1) if total > 0 else 0,
                 "updated_at": datetime.now().isoformat()
             }

@@ -47,7 +47,28 @@ document.addEventListener("DOMContentLoaded", function () {
           // alert("checking");
           loadDefectImagesFromBridge();
         }
-      });}
+      });
+
+      // 🔥 ADD THIS BELOW counts_signal
+      if (bridge.storage_signal) {
+        bridge.storage_signal.connect((data) => {
+          try {
+            const parsed = JSON.parse(data);
+
+            const used = parsed?.data?.used_percent ?? 0;
+            const free = parsed?.data?.free_percent ?? 0;
+
+            const el = document.getElementById("storageLabel");
+            if (el) {
+              el.textContent = `Used: ${used}% | Free: ${free}%`;
+            }
+
+          } catch (err) {
+            console.error("Storage parse error:", err);
+          }
+        });
+      }
+    }
     } else {
       showToast("⚠️ No Qt Bridge - Using Laptop Webcam", 4000, "warning");
     }
