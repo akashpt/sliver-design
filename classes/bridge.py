@@ -4,6 +4,7 @@ import json
 import os
 import sqlite3
 import random
+import shutil
 from datetime import datetime
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QTimer, QStandardPaths, QDir
 from PyQt5.QtWidgets import QApplication  # Only if needed elsewhere
@@ -17,6 +18,7 @@ class Bridge(QObject):
 
     frame_signal = pyqtSignal(str)
     counts_signal = pyqtSignal(str)
+    storage_signal = pyqtSignal(str)    
 
     def __init__(self, app_ref):
         super().__init__()
@@ -37,6 +39,7 @@ class Bridge(QObject):
         self.training_folder_name = ""
         self.training_save_interval = 1000   # milliseconds
         self.last_training_save_time = 0
+        self.get_system_storage()
 
         self.test_image_path = None
         self.test_frame = None
@@ -66,12 +69,11 @@ class Bridge(QObject):
 
         if self.threshold:
             self.detector.color_threshold = float(self.threshold)
-
+            self.get_system_storage()
 
         # # For testing
-        # self.test_image_path = r"/home/texa/Aarthy_data/sliver-design/imgs/good/img_0001.bmp"
+        # self.test_image_path = r"//home/texa_developer/Downloads/img_0001.bmp"
         # self.test_frame = cv2.imread(self.test_image_path)
-
 
     # ====================== CAMERA ======================
     # ====================== SAVE USER CONFIG ======================
@@ -178,6 +180,8 @@ class Bridge(QObject):
             if not ok:
                 raise Exception("cv2.imwrite failed")
 
+            self.get_system_storage()
+
             print(f"✅ Training image saved: {file_path}")
             return str(file_path)
 
@@ -269,7 +273,7 @@ class Bridge(QObject):
         if job_id:
             self.load_db_counts_for_job(job_id)
 
-
+        self.get_system_storage()
 
         counts_data = {
                 "inspected": self.inspected,
@@ -283,7 +287,7 @@ class Bridge(QObject):
         try:
             frame = None
 
-            # # For testing
+            # # # For testing
             # if self.test_image_path:
             #     frame = cv2.imread(self.test_image_path)
             #     frame = self.test_frame.copy()
@@ -291,6 +295,8 @@ class Bridge(QObject):
             #     if frame is None:
             #         print("Test image not found")
             #         return
+            # else:
+            #     return 
 
             # =========================
             # MINDVISION CAMERA
@@ -303,6 +309,7 @@ class Bridge(QObject):
                     self.use_mindvision = False
                     self.cap = cv2.VideoCapture(0)
                     return
+
 
                 # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
@@ -368,16 +375,54 @@ class Bridge(QObject):
                     filename = f"defect_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.jpg"
                     file_path = job_folder / filename
                     save_path = f"{job_id}/{filename}"
-                    saved = cv2.imwrite(str(file_path), self.current_frame)
+                    # saved = cv2.imwrite(str(file_path), self.current_frame)
+                    saved = cv2.imwrite(str(file_path), processed_img if processed_img is not None else self.current_frame)
                     bad_image_path = save_path
 
 
                     if saved:
                         from classes.send_mail import send_email_with_attachments
                         import threading
+
+                        # ✅ ADD HERE
+                        defect_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+                        frame_no = self.inspected
+                        material = job_id
+                        training_color = "-"
+                        defect_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+                        frame_no = self.inspected
+                        material = job_id
+                        training_color = "-"
+
+                        conn = sqlite3.connect(self.db_path)
+                        cursor = conn.cursor()
+                        cursor.execute("""
+                            SELECT machine_no
+                            FROM REPORT
+                            WHERE job_id = ?
+                            ORDER BY id DESC
+                            LIMIT 1
+                        """, (job_id,))
+                        row = cursor.fetchone()
+                        conn.close()
+
+                        if row and row[0]:
+                            machine_no = row[0]
+                        else:
+                            machine_no = "M1"
+
+                        try:
+                            if os.path.exists(TRAINING_SETTINGS_FILE):
+                                with open(TRAINING_SETTINGS_FILE, "r", encoding="utf-8") as f:
+                                    training_data = json.load(f)
+                                    training_color = training_data.get("color", "-")
+                        except Exception as e:
+                            print("❌ Error reading training settings for email:", e)
+
+                        # EXISTING THREAD BELOW
                         threading.Thread(
                             target=send_email_with_attachments,
-                            args=(str(file_path),),   
+                            args=(str(file_path), machine_no, frame_no, material, training_color, defect_time),
                             daemon=True
                         ).start()
                         print(f"Saved: {file_path}")
@@ -388,7 +433,9 @@ class Bridge(QObject):
             # =========================
             # SEND TO UI
             # =========================
-            _, buffer = cv2.imencode(".jpg", frame)
+            # _, buffer = cv2.imencode(".jpg", frame)
+            display_frame = processed_img if processed_img is not None else frame
+            _, buffer = cv2.imencode(".jpg", display_frame)
             jpg = base64.b64encode(buffer).decode("utf-8")
             self.frame_signal.emit(jpg)
 
@@ -536,6 +583,8 @@ class Bridge(QObject):
             conn.commit()
             conn.close()
 
+            self.get_system_storage()
+
             print(f"✅ Report row inserted: status={result_status}, image={bad_image_path}")
 
         except Exception as e:
@@ -599,7 +648,7 @@ class Bridge(QObject):
                 SELECT 
                     COUNT(*) AS inspected,
                     SUM(CASE WHEN LOWER(result) = 'good' THEN 1 ELSE 0 END) AS good,
-                    SUM(CASE WHEN LOWER(result) = 'bad' THEN 1 ELSE 0 END) AS bad
+                    SUM(CASE WHEN LOWER(result) IN ('bad', 'defect', 'strip missing') THEN 1 ELSE 0 END) AS bad
                 FROM REPORT
                 WHERE job_id = ?
             """, (job_id,))
@@ -720,6 +769,8 @@ class Bridge(QObject):
 
             trainer = StripColorTraining()
             result = trainer.train(str(training_folder), folder_name)
+
+            self.get_system_storage()
 
             # Clear current training state
             self.training_folder_name = ""
@@ -913,6 +964,52 @@ class Bridge(QObject):
                     "values": []
                 },
                 "message": str(e),
+            })
+
+    def load_email_template(self):
+        try:
+            with open(EMAIL_PAGE, "r", encoding="utf-8") as file:
+                return file.read()
+        except Exception as e:
+            print("❌ load_email_template error:", e)
+            return ""
+
+    @pyqtSlot(result=str)
+    def get_system_storage(self):
+        try:
+            total, used, free = shutil.disk_usage("/")
+
+            def to_gb(value):
+                return round(value / (1024 ** 3), 2)
+
+            data = {
+                "total_gb": to_gb(total),
+                "used_gb": to_gb(used),
+                "free_gb": to_gb(free),
+                "used_percent": round((used / total) * 100, 1) if total > 0 else 0,
+                "free_percent": round((free / total) * 100, 1) if total > 0 else 0,
+                "updated_at": datetime.now().isoformat()
+            }
+
+            with open(STORAGE_FILE, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+
+            payload = json.dumps({
+                "ok": True,
+                "data": data
+            })
+
+            self.storage_signal.emit(payload)
+
+            # print(f"✅ Storage saved to: {STORAGE_FILE}")
+
+            return payload
+
+        except Exception as e:
+            print("❌ get_system_storage error:", e)
+            return json.dumps({
+                "ok": False,
+                "message": str(e)
             })
     # ====================== REPORT SUMMARY End ======================
 

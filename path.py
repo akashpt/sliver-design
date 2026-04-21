@@ -50,6 +50,7 @@ INDEX_PAGE = TEMPLATES_DIR / "index.html"
 TRAINING_PAGE = TEMPLATES_DIR / "training.html"
 CONTROLLER_PAGE = TEMPLATES_DIR / "controller.html"
 REPORT_PAGE = TEMPLATES_DIR / "report.html"
+EMAIL_PAGE = TEMPLATES_DIR / "email.html"
 
 # CONFIG (READ-ONLY SDK FILES)
 CONFIG_DIR = APP_DIR / "camera_sdk"
@@ -73,6 +74,8 @@ PREDICTION_IMAGES_DIR = DATA_DIR / "prediction_images"
 
 #USER CONFIG
 USER_CONFIG_FILE = RUN_DIR / "settings.json"
+#STORAGE
+STORAGE_FILE = RUN_DIR / "storage.json"
 
 # DATABASE
 DB_FILE = RUN_DIR / "sliver.db"
@@ -113,3 +116,6 @@ if not COUNT_FILE.exists():
 
 if not USER_CONFIG_FILE.exists():
     USER_CONFIG_FILE.write_text("{}", encoding="utf-8")
+
+if not STORAGE_FILE.exists():
+    STORAGE_FILE.write_text("{}", encoding="utf-8")

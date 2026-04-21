@@ -1,29 +1,58 @@
 import smtplib
 import os
 import time
+from path import EMAIL_PAGE
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 
-def send_email_with_attachments(attachments_path,retries=3, wait_seconds=5):
+
+def load_email_template():
+    with open(EMAIL_PAGE, "r", encoding="utf-8") as file:
+        return file.read()
+
+def send_email_with_attachments(attachments_path,machine_no="",frame_no="",material="",color="",defect_time="",retries=3,wait_seconds=5):
     SMTP_SERVER = "smtp.gmail.com"
     SMTP_PORT = 587
-    # SENDER_EMAIL = "kevintexainnovates@gmail.com"
-    SENDER_PASSWORD = "cpqa kkdc vobg dhuv"
+    SENDER_EMAIL = "divyadharsinimurugesan@gmail.com"
+    SENDER_PASSWORD = "jbfg kjeh wtld uajn"
+    # RECIPIENT_EMAILS = [
+    #     "sniyas8675@gmail.com",
+    #     "manojg0795@gmail.com",
+    #     "nishanthchakkra@gmail.com"
+    # ]
     RECIPIENT_EMAILS = [
-        #"sniyas8675@gmail.com",
-        #"manojg0795@gmail.com",
-        #"nishanthchakkra@gmail.com"
+        "divyadharsinimurugesan@gmail.com",
+        "kalaiselvi29778@gmail.com"
     ]
-    from datetime import datetime
+    # from datetime import datetime
 
-    timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+    # timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
     
-    subject = " Bad Images Report"
-    body = f"Dear Team,\n\nPlease find attached the defect report and bad images report for review.\n\nDrawing Frame No: 3 \nCurrently running metiral: Radha\nMetiral Color: Yellow\n\nBest Regards,\nYour Automated System\n\nDate Time :{timestamp}\n\nDefect images attached below:"
-    
+    # subject = " Bad Images Report"
+    # # body = f"Dear Team,\n\nPlease find attached the defect report and bad images report for review.\n\nDrawing Frame No: 3 \nCurrently running metiral: Radha\nMetiral Color: Yellow\n\nBest Regards,\nYour Automated System\n\nDate Time :{timestamp}\n\nDefect images attached below:"
+    # html_template = load_email_template()
+
+    # body = html_template.format(
+    #     frame_no=3,
+    #     material="Radha",
+    #     color="Yellow",
+    #     datetime=timestamp
+    # )
+
+    subject = "Bad Images Report"
+
+    html_template = load_email_template()
+
+    body = html_template.format(
+        machine_no=machine_no if machine_no != "" else "-",
+        frame_no=frame_no if frame_no != "" else "-",
+        material=material if material else "-",
+        color=color if color else "-",
+        datetime=defect_time if defect_time else "-"
+    )
     # attachments = ["Lycra_Defect_Report.pdf", "bad_images_report.pdf"]
     attachments = [attachments_path]
 
@@ -33,7 +62,7 @@ def send_email_with_attachments(attachments_path,retries=3, wait_seconds=5):
             msg['From'] = SENDER_EMAIL
             msg['To'] = ", ".join(RECIPIENT_EMAILS)
             msg['Subject'] = subject
-            msg.attach(MIMEText(body, 'plain'))
+            msg.attach(MIMEText(body, 'html'))
 
             for file in attachments:
                 if os.path.exists(file):
