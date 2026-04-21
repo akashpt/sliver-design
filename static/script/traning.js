@@ -201,23 +201,47 @@ const Bridge = (() => {
   const available = () =>
     typeof window.bridge !== "undefined" && window.bridge !== null;
 
-  function sendTrainingSession(data) {
+function sendTrainingSession(data) {
+  return new Promise((resolve) => {
     try {
       if (
         available() &&
         typeof window.bridge.saveTrainingSession === "function"
       ) {
-        window.bridge.saveTrainingSession(JSON.stringify(data));
-        addLog("✅ Session data sent to bridge.");
+        window.bridge.saveTrainingSession(JSON.stringify(data), function (raw) {
+          try {
+            const res = typeof raw === "string" ? JSON.parse(raw) : raw;
+            addLog("✅ Session data sent to bridge.");
+            resolve(res);
+          } catch (e) {
+            console.error("saveTrainingSession parse error:", e);
+            resolve({
+              ok: false,
+              job_id: "",
+              message: "Invalid response from bridge",
+            });
+          }
+        });
       } else {
         console.warn("Bridge not available — session data:", data);
         addLog("⚠ Bridge unavailable. Data logged to console.");
+        resolve({
+          ok: false,
+          job_id: "",
+          message: "Bridge unavailable",
+        });
       }
     } catch (err) {
       console.error("Bridge communication error:", err);
       addLog("❌ Bridge error: " + err.message);
+      resolve({
+        ok: false,
+        job_id: "",
+        message: err.message,
+      });
     }
-  }
+  });
+}
 
   // ── FIX: QWebChannel slots with return values are ASYNC.
   //    Calling window.bridge.startCamera() synchronously always returns
@@ -457,7 +481,8 @@ async function stopCamera() {
     if (!ok) return;
 
     activeMode = "live";
-    $("statusLabel").textContent = "LIVE";
+    // $("statusLabel").textContent = "LIVE";
+    if ($("statusLabel")) $("statusLabel").textContent = "LIVE";
     applyUIState("live");
     addLog("🎥 Live camera started.");
   }
@@ -466,7 +491,8 @@ async function stopCamera() {
     if (activeMode !== "live") return;
     stopCamera();
     activeMode = null;
-    $("statusLabel").textContent = "STANDBY";
+    // $("statusLabel").textContent = "STANDBY";
+    if ($("statusLabel")) $("statusLabel").textContent = "STANDBY";
     applyUIState(null);
     addLog("⏹ Live camera stopped.");
   }
@@ -534,7 +560,16 @@ async function stopCamera() {
     $("trainingSessionModal").style.display = "none";
 
     // Send values to bridge.py → saveTrainingSession()
-    Bridge.sendTrainingSession({  count, yarn, color });
+    // Bridge.sendTrainingSession({  count, yarn, color });
+    const sessionRes = await Bridge.sendTrainingSession({ count, yarn, color });
+
+    if (!sessionRes?.ok) {
+      showToast(sessionRes?.message || "❌ Failed to start training session", 4000);
+      addLog("❌ Failed to start training session: " + (sessionRes?.message || "Unknown error"));
+      return;
+    }
+
+    $("jobIdLabel").textContent = sessionRes.job_id || "";
 
     // Update header Job ID pill
     // $("jobIdLabel").textContent = jobId;
@@ -544,7 +579,8 @@ async function stopCamera() {
     if (!ok) return;
 
     activeMode = "training";
-    $("statusLabel").textContent = "TRAINING";
+    // $("statusLabel").textContent = "TRAINING";
+    if ($("statusLabel")) $("statusLabel").textContent = "TRAINING";
     applyUIState("training");
     addLog(
       `🎓 Training — Job: · Count: ${count} · Yarn: ${yarn} · Color: ${color}`,
@@ -581,6 +617,7 @@ async function stopCamera() {
       }
 
       if (res?.ok) {
+        $("jobIdLabel").textContent = "";
         showToast("✅ Training completed and model generated", 4000);
         addLog("✅ Training stopped and model generated successfully.");
       } else {
@@ -594,7 +631,7 @@ async function stopCamera() {
   }
 
   activeMode = null;
-  $("statusLabel").textContent = "STANDBY";
+  // $("statusLabel").textContent = "STANDBY";
   applyUIState(null);
 }
 

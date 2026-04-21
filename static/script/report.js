@@ -105,14 +105,14 @@ function slotUpdateMetricCards({period,inspected,good,defective,rate,breakdown,l
     window._donutChart.update();
   }
 
-  if (window._barChart) {
-    const labels = breakdown?.labels?.length ? breakdown.labels : ["Good", "Defective"];
-    const values = breakdown?.values?.length ? breakdown.values : [good || 0, defective || 0];
+  // if (window._barChart) {
+  //   const labels = breakdown?.labels?.length ? breakdown.labels : ["Good", "Defective"];
+  //   const values = breakdown?.values?.length ? breakdown.values : [good || 0, defective || 0];
 
-    window._barChart.data.labels = labels;
-    window._barChart.data.datasets[0].data = values;
-    window._barChart.update();
-  }
+  //   window._barChart.data.labels = labels;
+  //   window._barChart.data.datasets[0].data = values;
+  //   window._barChart.update();
+  // }
 
   if (window._lineChart) {
     const labels = line_chart?.labels?.length ? line_chart.labels : [];
@@ -355,49 +355,49 @@ window._donutChart = new Chart(document.getElementById("chartDonut"), {
 //     },
 //   },
 // });
-window._barChart = new Chart(document.getElementById("chartBar"), {
-  type: "bar",
-  data: {
-    labels: ["Good", "Defective"],
-    datasets: [
-      {
-        label: "Occurrences",
-        data: [0, 0],
-        backgroundColor: [
-          "rgba(22,163,74,0.85)",
-          "rgba(192,32,46,0.85)",
-          "rgba(192,32,46,0.68)",
-          "rgba(192,32,46,0.52)",
-          "rgba(192,32,46,0.38)"
-        ],
-        borderRadius: 5,
-        borderSkipped: false,
-        maxBarThickness: 44,
-      },
-    ],
-  },
-  options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-    },
-    scales: {
-      x: {
-        grid: { display: false },
-        ticks: { font: { size: 10 } },
-      },
-      y: {
-        beginAtZero: true,
-        grid: { color: gridCol },
-        ticks: {
-          stepSize: 1,
-          font: { size: 10 },
-        },
-      },
-    },
-  },
-});
+// window._barChart = new Chart(document.getElementById("chartBar"), {
+//   type: "bar",
+//   data: {
+//     labels: ["Good", "Defective"],
+//     datasets: [
+//       {
+//         label: "Occurrences",
+//         data: [0, 0],
+//         backgroundColor: [
+//           "rgba(22,163,74,0.85)",
+//           "rgba(192,32,46,0.85)",
+//           "rgba(192,32,46,0.68)",
+//           "rgba(192,32,46,0.52)",
+//           "rgba(192,32,46,0.38)"
+//         ],
+//         borderRadius: 5,
+//         borderSkipped: false,
+//         maxBarThickness: 44,
+//       },
+//     ],
+//   },
+//   options: {
+//     responsive: true,
+//     maintainAspectRatio: false,
+//     plugins: {
+//       legend: { display: false },
+//     },
+//     scales: {
+//       x: {
+//         grid: { display: false },
+//         ticks: { font: { size: 10 } },
+//       },
+//       y: {
+//         beginAtZero: true,
+//         grid: { color: gridCol },
+//         ticks: {
+//           stepSize: 1,
+//           font: { size: 10 },
+//         },
+//       },
+//     },
+//   },
+// });
 
 // ─────────────────────────────────────────────
 //  Toast

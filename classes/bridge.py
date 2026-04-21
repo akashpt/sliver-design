@@ -727,7 +727,7 @@ class Bridge(QObject):
             self.good = 0
             self.bad = 0
 
-    @pyqtSlot(str)
+    @pyqtSlot(str, result=str)
     def saveTrainingSession(self, json_str: str):
         try:
             data = json.loads(json_str)
@@ -747,7 +747,7 @@ class Bridge(QObject):
             folder_name = folder_name.replace(" ", "_")
             print("folder_name =", folder_name)
 
-            job_folder = self.get_training_job_folder(folder_name)# clear_existing=True)
+            job_folder = self.get_training_job_folder(folder_name)
             print("job_folder =", job_folder)
 
             # Mark training as active
@@ -756,8 +756,19 @@ class Bridge(QObject):
 
             print(f"✅ Training session started: {folder_name}")
 
+            return json.dumps({
+                "ok": True,
+                "job_id": folder_name,
+                "message": "Training session started"
+            })
+
         except Exception as e:
             print(f"❌ saveTrainingSession error: {e}")
+            return json.dumps({
+                "ok": False,
+                "job_id": "",
+                "message": str(e)
+            })
 
 
     @pyqtSlot(result=str)
@@ -1036,3 +1047,12 @@ class Bridge(QObject):
     @pyqtSlot()
     def goTraining(self):
         self.app_ref.load_page(TRAINING_PAGE)
+
+    #=====================================================================
+    # 👉 467.89 GB = 100% (always)
+    # 👉 94.9% is only used + free (incomplete data)
+    # 👉 Remaining ~5.1% (23.84 GB) is:
+
+    # system reserved
+    # filesystem overhead
+    # hidden usage
