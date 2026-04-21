@@ -9,12 +9,12 @@ from email import encoders
 def send_email_with_attachments(attachments_path,retries=3, wait_seconds=5):
     SMTP_SERVER = "smtp.gmail.com"
     SMTP_PORT = 587
-    SENDER_EMAIL = "kevintexainnovates@gmail.com"
+    # SENDER_EMAIL = "kevintexainnovates@gmail.com"
     SENDER_PASSWORD = "cpqa kkdc vobg dhuv"
     RECIPIENT_EMAILS = [
-        "sniyas8675@gmail.com",
-        "manojg0795@gmail.com",
-        "nishanthchakkra@gmail.com"
+        #"sniyas8675@gmail.com",
+        #"manojg0795@gmail.com",
+        #"nishanthchakkra@gmail.com"
     ]
     from datetime import datetime
 

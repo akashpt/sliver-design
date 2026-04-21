@@ -352,7 +352,8 @@ class Bridge(QObject):
             elif self.process == "live_stream":
                 status = "live_stream"
             else:
-                status = self.run_detection(frame)
+                # status = self.run_detection(frame)
+                status, processed_img = self.run_detection(frame)
 
 
             bad_image_path = None
@@ -376,7 +377,7 @@ class Bridge(QObject):
                         import threading
                         threading.Thread(
                             target=send_email_with_attachments,
-                            args=(str(file_path),)
+                            args=(str(file_path),),   
                             daemon=True
                         ).start()
                         print(f"Saved: {file_path}")
@@ -405,17 +406,6 @@ class Bridge(QObject):
     def run_detection(self, frame):
          # Every frame is inspected
         self.inspected += 1
-
-        # is_defect = random.random() < 0.3
-
-        # if is_defect:
-        #     self.bad += 1
-        #     status = "bad"
-        # else:
-        #     self.good += 1
-        #     status = "good"
-
-        # return status
 
         # Get model + threshold
         model_key, threshold = self.get_job_from_config()
