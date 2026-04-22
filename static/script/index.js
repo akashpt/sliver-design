@@ -81,14 +81,23 @@ document.addEventListener("DOMContentLoaded", function () {
   renderDefectThumbs();
   resetToInitialState();
 
-  const jobIdInput = document.getElementById("jobIdInput");
-  const thresholdInput = document.getElementById("thresholdInput");
+//   const jobIdInput = document.getElementById("jobIdInput");
+//   const thresholdInput = document.getElementById("thresholdInput");
 
-  // Enable OK button check
-  jobIdInput.addEventListener("change", checkCanConfirm);
-  thresholdInput.addEventListener("input", checkCanConfirm);
+//   // Enable OK button check
+//   jobIdInput.addEventListener("change", checkCanConfirm);
+//   thresholdInput.addEventListener("input", checkCanConfirm);
+
+const jobIdInput = document.getElementById("jobIdInput");
+const thresholdInput = document.getElementById("thresholdInput");
+
+// Enable OK button check
+jobIdInput.addEventListener("change", async () => {
+  await updateThresholdFromSelectedJob();
 });
 
+thresholdInput.addEventListener("input", checkCanConfirm);
+});
 // document.addEventListener("DOMContentLoaded", () => {
 //   loadDefectImagesFromBridge();
 // });
@@ -224,6 +233,19 @@ async function loadDropdownData() {
     }
 
     // If both preset values are present, treat config as already confirmed
+    // if (presetJobId && presetThreshold) {
+    //   document.getElementById("okBtn").disabled = true;
+    //   document.getElementById("startBtn").disabled = false;
+    //   showToast(
+    //     `🔒 Auto-configured — Job: ${presetJobId} | Threshold: ${presetThreshold}`,
+    //     4000,
+    //   );
+    //   addLog(
+    //     `[Bridge] Auto-config applied → Job: ${presetJobId}, Threshold: ${presetThreshold}`,
+    //   );
+    // } else {
+    //   checkCanConfirm();
+    // }
     if (presetJobId && presetThreshold) {
       document.getElementById("okBtn").disabled = true;
       document.getElementById("startBtn").disabled = false;
@@ -235,6 +257,9 @@ async function loadDropdownData() {
         `[Bridge] Auto-config applied → Job: ${presetJobId}, Threshold: ${presetThreshold}`,
       );
     } else {
+      if (jobSelect.value) {
+        await updateThresholdFromSelectedJob();
+      }
       checkCanConfirm();
     }
   } catch (error) {
@@ -363,6 +388,42 @@ function checkCanConfirm() {
 }
 
 // ─── Confirm Configuration ──────────────────────────────────────────
+async function updateThresholdFromSelectedJob() {
+  try {
+    const jobSelect = document.getElementById("jobIdInput");
+    const thresholdInput = document.getElementById("thresholdInput");
+
+    const selectedJob = jobSelect.value?.trim();
+
+    if (!selectedJob) {
+      thresholdInput.value = "";
+      currentThreshold = "";
+      checkCanConfirm();
+      return;
+    }
+
+    if (!bridge || typeof bridge.get_threshold_by_job !== "function") {
+      console.warn("get_threshold_by_job bridge function not available");
+      checkCanConfirm();
+      return;
+    }
+
+    const raw = await bridge.get_threshold_by_job(selectedJob);
+    const parsed = JSON.parse(raw);
+
+    if (parsed.ok) {
+      thresholdInput.value = parsed.threshold ? String(parsed.threshold) : "";
+      currentThreshold = parsed.threshold ? String(parsed.threshold) : "";
+    } else {
+      thresholdInput.value = "";
+      currentThreshold = "";
+    }
+
+    checkCanConfirm();
+  } catch (err) {
+    console.error("❌ Failed to update threshold for selected job:", err);
+  }
+}
 function confirmConfig() {
   const jobId = document.getElementById("jobIdInput").value;
   const threshold = document.getElementById("thresholdInput").value.trim();

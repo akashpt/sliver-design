@@ -13,6 +13,7 @@ def init_db():
             shift_id INTEGER,
             machine_no TEXT NOT NULL,
             job_id TEXT NOT NULL,
+            threshold TEXT,
             result TEXT NOT NULL,
             total_strips INTEGER,
             bad_strips INTEGER,
@@ -23,11 +24,14 @@ def init_db():
         )
         """)
 
+        cursor.execute("PRAGMA table_info(REPORT)")
+        columns = [row[1] for row in cursor.fetchall()]
+
+        if "threshold" not in columns:
+            cursor.execute("ALTER TABLE REPORT ADD COLUMN threshold TEXT")
+
         conn.commit()
         conn.close()
-
-        # print("✅ Database + Tables initialized from app.py")
-        # print("📂 DB Path:", DB_FILE)
 
     except Exception as e:
         print("❌ DB Init Error:", e)

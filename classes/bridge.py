@@ -510,18 +510,15 @@ class Bridge(QObject):
 
     @pyqtSlot(result=str)
     def current_job_id(self):
-        default_threshold = "45"
+        default_threshold = ""
 
         try:
             jobs = self.get_model_job_ids()
 
-            # Fallback if models folder is empty
             if not jobs:
                 jobs = []
 
-            default_job = jobs[0] if jobs else ""
-
-            job_id = default_job
+            job_id = ""
             threshold = default_threshold
 
             if os.path.exists(self.config_path):
@@ -529,13 +526,24 @@ class Bridge(QObject):
                     config = json.load(f)
 
                 saved_job_id = config.get("job_id", "")
-                saved_threshold = config.get("threshold", default_threshold)
 
-                # use saved job only if it exists in models folder
                 if saved_job_id in jobs:
                     job_id = saved_job_id
 
-                threshold = saved_threshold
+            if not job_id and jobs:
+                job_id = jobs[0]
+
+            # latest threshold from DB for selected job
+            latest_db_threshold = self.get_latest_threshold_from_report(job_id)
+
+            if latest_db_threshold:
+                threshold = latest_db_threshold
+            else:
+                # fallback from config if DB value not found
+                if os.path.exists(self.config_path):
+                    with open(self.config_path, "r", encoding="utf-8") as f:
+                        config = json.load(f)
+                    threshold = str(config.get("threshold", default_threshold))
 
             data = {
                 "job_id": job_id,
@@ -564,7 +572,7 @@ class Bridge(QObject):
 
     def save_report_entry(self, result_status, bad_image_path=""):
         try:
-            job_id, _ = self.get_job_from_config()
+            job_id, threshold = self.get_job_from_config()
 
             if not job_id:
                 print("⚠️ No job_id found in config")
@@ -578,17 +586,19 @@ class Bridge(QObject):
                     shift_id,
                     machine_no,
                     job_id,
+                    threshold,
                     result,
                     total_strips,
                     bad_strips,
                     bad_strip_number,
                     bad_image_path
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 1,
                 "M1",
                 job_id,
+                str(threshold) if threshold is not None else "",
                 result_status,
                 0,
                 0,
@@ -601,10 +611,61 @@ class Bridge(QObject):
 
             self.get_system_storage()
 
-            print(f"✅ Report row inserted: status={result_status}, image={bad_image_path}")
+            print(
+                f"✅ Report row inserted: job_id={job_id}, threshold={threshold}, "
+                f"status={result_status}, image={bad_image_path}"
+            )
 
         except Exception as e:
             print("❌ save_report_entry error:", e)
+
+    def get_latest_threshold_from_report(self, job_id):
+        try:
+            if not job_id:
+                return ""
+
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT threshold
+                FROM REPORT
+                WHERE job_id = ?
+                AND threshold IS NOT NULL
+                AND TRIM(threshold) != ''
+                ORDER BY id DESC
+                LIMIT 1
+            """, (job_id,))
+
+            row = cursor.fetchone()
+            conn.close()
+
+            return str(row[0]) if row and row[0] is not None else ""
+
+        except Exception as e:
+            print("❌ get_latest_threshold_from_report error:", e)
+            return ""
+
+
+    @pyqtSlot(str, result=str)
+    def get_threshold_by_job(self, job_id):
+        try:
+            threshold = self.get_latest_threshold_from_report(job_id)
+
+            return json.dumps({
+                "ok": True,
+                "job_id": job_id,
+                "threshold": threshold
+            })
+
+        except Exception as e:
+            print("❌ get_threshold_by_job error:", e)
+            return json.dumps({
+                "ok": False,
+                "job_id": job_id,
+                "threshold": "",
+                "message": str(e)
+            })
     
 
     @pyqtSlot(result=str)
