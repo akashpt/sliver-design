@@ -1024,7 +1024,7 @@ const viewer = document.getElementById("imageViewer");
 
 const zoomInBtn = document.getElementById("zoomInBtn");
 const zoomOutBtn = document.getElementById("zoomOutBtn");
-const resetBtn = document.getElementById("resetBtn");
+const zoomResetBtn = document.getElementById("zoomResetBtn");
 
 let zoomLevel = 1;
 const zoomStep = 0.2;
