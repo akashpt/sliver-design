@@ -734,19 +734,21 @@ function setUIState(running) {
   const resetBtn = document.getElementById("resetBtn");
 
   if (running) {
+    // Detection is running: only Stop is active, Reset is locked
     startBtn.disabled = true;
     stopBtn.disabled = false;
     jobSelect.disabled = true;
     thresholdInput.disabled = true;
     okBtn.disabled = true;
-    resetBtn.disabled = true;
+    resetBtn.disabled = true;   // Reset disabled while running
   } else {
-    startBtn.disabled = false; // ← Fixed: Allow starting again 
+    // Detection stopped: Start is disabled until Reset → re-configure
+    startBtn.disabled = true;   // Must Reset + re-confirm before starting again
     stopBtn.disabled = true;
     jobSelect.disabled = true;
     thresholdInput.disabled = true;
-    okBtn.disabled = true; // Allow re-config if needed
-    resetBtn.disabled = false;
+    okBtn.disabled = true;
+    resetBtn.disabled = false;  // Reset enabled so user can re-configure
   }
 }
 
@@ -1024,7 +1026,7 @@ const viewer = document.getElementById("imageViewer");
 
 const zoomInBtn = document.getElementById("zoomInBtn");
 const zoomOutBtn = document.getElementById("zoomOutBtn");
-const zoomResetBtn = document.getElementById("zoomResetBtn");
+const resetBtn = document.getElementById("resetBtn");
 
 let zoomLevel = 1;
 const zoomStep = 0.2;
