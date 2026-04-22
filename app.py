@@ -47,7 +47,6 @@ class MainWindow(QMainWindow):
         # WebEngine View
         self.view = QWebEngineView()
         self.setCentralWidget(self.view)
-
         # Bridge & WebChannel
         self.bridge = Bridge(self)
         self.channel = QWebChannel()

@@ -1102,6 +1102,13 @@ class Bridge(QObject):
             })
     # ====================== REPORT SUMMARY End ======================
 
+# invoice viewer slot 
+    @pyqtSlot()
+    def openInvoiceViewer(self):
+        from classes.invoice_viewer import InvoiceViewer
+        viewer = InvoiceViewer()
+        viewer.exec_()
+        
     # Navigation
     @pyqtSlot()
     def goHome(self):

@@ -1186,3 +1186,20 @@ function saveUserConfigToBridge(jobId, threshold) {
     }
   });
 }
+
+
+
+
+// invoice
+
+
+  function waitForBridge(callback, retries = 10) {
+    if (window.bridge) {
+      callback();
+    } else if (retries > 0) {
+      setTimeout(() => waitForBridge(callback, retries - 1), 200);
+    } else {
+      showToast("Bridge not connected", 2000);
+    }
+  }
+

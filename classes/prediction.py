@@ -111,10 +111,9 @@ class StripColorPrediction:
 
         vis = img.copy()
         strips = self.detect_horizontal_strips(img)
-        total_strip_count = len(strips)
 
         if len(strips) != self.expected_strip_count:
-            return "strip missing", vis, vis, 0, [], total_strip_count
+            return "strip missing", vis, vis, 0, []
 
 
         strip_lab_values = model_data["strip_lab_values"]
@@ -189,7 +188,7 @@ class StripColorPrediction:
         raw_img = img
         processed_img = vis
 
-        return status, processed_img, raw_img, bad_strip_count, bad_strip_indices, total_strip_count
+        return status, processed_img, raw_img, bad_strip_count, bad_strip_indices
 
     # ---------------- ----------------
     def process_image(self, img, model_key):
@@ -198,7 +197,7 @@ class StripColorPrediction:
         if model_data is None:
             print("❌ MODEL NOT FOUND")
             vis = img.copy()
-            return "error", vis, img, 0, [], 0
+            return "error", vis, img, 0, []
 
         return self.process_frame(img, model_data)
 
