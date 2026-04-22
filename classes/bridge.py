@@ -72,8 +72,8 @@ class Bridge(QObject):
             self.get_system_storage()
 
         # # For testing
-        # self.test_image_path = r"//home/texa_developer/Downloads/img_0001.bmp"
-        # self.test_frame = cv2.imread(self.test_image_path)
+        self.test_image_path = r"/home/texa/Downloads/imgs/good/img_0001.bmp"
+        self.test_frame = cv2.imread(self.test_image_path)
 
     # ====================== CAMERA ======================
     # ====================== SAVE USER CONFIG ======================
@@ -311,8 +311,7 @@ class Bridge(QObject):
             #     if frame is None:
             #         print("Test image not found")
             #         return
-            # else:
-            #     return 
+
 
             # =========================
             # MINDVISION CAMERA
@@ -343,7 +342,7 @@ class Bridge(QObject):
             # =========================
             # 🔥 ROTATE FRAME
             # =========================
-            # frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
             # =========================defect_path
             # SAVE CURRENT FRAME
@@ -376,7 +375,7 @@ class Bridge(QObject):
                 status = "live_stream"
             else:
                 # status = self.run_detection(frame)
-                status, processed_img = self.run_detection(frame)
+                status, processed_img, raw_img = self.run_detection(frame)
 
 
             bad_image_path = None
@@ -388,12 +387,40 @@ class Bridge(QObject):
                     job_folder = PREDICTION_IMAGES_DIR / job_id
                     job_folder.mkdir(parents=True, exist_ok=True)
 
-                    filename = f"defect_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.jpg"
-                    file_path = job_folder / filename
-                    save_path = f"{job_id}/{filename}"
+
+                    # processed image folder
+                    defect_folder = job_folder / "defect"
+                    defect_folder.mkdir(parents=True, exist_ok=True)
+
+                    # raw image folder
+                    raw_folder = job_folder / "defect_raw"
+                    raw_folder.mkdir(parents=True, exist_ok=True)
+
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+
+                    # processed image path
+                    file_path = defect_folder / f"defect_{timestamp}.jpg"
+
+                    # raw image path
+                    raw_path = raw_folder / f"raw_{timestamp}.jpg"
+
+
+                    # filename = f"defect_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.jpg"
+                    # file_path = job_folder / filename
+                    # save_path = f"{job_id}/{filename}"
+                    save_path = f"{job_id}/defect/{file_path.name}"
+
+
+
                     # saved = cv2.imwrite(str(file_path), self.current_frame)
                     saved = cv2.imwrite(str(file_path), processed_img if processed_img is not None else self.current_frame)
                     bad_image_path = save_path
+
+
+                    if raw_img is not None:
+                        cv2.imwrite(str(raw_path), raw_img)
+                    else:
+                        cv2.imwrite(str(raw_path), self.current_frame)
 
 
                     if saved:
@@ -477,7 +504,7 @@ class Bridge(QObject):
             self.detector.color_threshold = float(threshold)
 
         # Prediction file function
-        status, processed_img, raw_img, bad_count, bad_indices = self.detector.process_image(frame, model_key)
+        status, processed_img, raw_img, _, _ = self.detector.process_image(frame, model_key)
 
         # Update counts
         if status == "good":
@@ -492,7 +519,7 @@ class Bridge(QObject):
         # if processed_img is not None:
         #     self.current_frame = processed_img
 
-        return status,processed_img
+        return status,processed_img, raw_img
 
     def get_model_job_ids(self):
         try:
