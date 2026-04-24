@@ -516,7 +516,7 @@ function resetToInitialState() {
   document.getElementById("startBtn").disabled = true;
   document.getElementById("stopBtn").disabled = true;
   document.getElementById("okBtn").disabled = true;
-  document.getElementById("resetBtn").disabled = false;
+  document.getElementById("resetConfigBtn").disabled = false;
 
   document.getElementById("jobIdInput").disabled = false;
   document.getElementById("thresholdInput").disabled = false;
@@ -731,7 +731,7 @@ function setUIState(running) {
   const jobSelect = document.getElementById("jobIdInput");
   const thresholdInput = document.getElementById("thresholdInput");
   const okBtn = document.getElementById("okBtn");
-  const resetBtn = document.getElementById("resetBtn");
+  const resetConfigBtn = document.getElementById("resetConfigBtn");
 
   if (running) {
     // Detection is running: only Stop is active, Reset is locked
@@ -740,7 +740,7 @@ function setUIState(running) {
     jobSelect.disabled = true;
     thresholdInput.disabled = true;
     okBtn.disabled = true;
-    resetBtn.disabled = true;   // Reset disabled while running
+    resetConfigBtn.disabled = true;   // Reset disabled while running
   } else {
     // Detection stopped: Start is disabled until Reset → re-configure
     startBtn.disabled = true;   // Must Reset + re-confirm before starting again
@@ -748,7 +748,7 @@ function setUIState(running) {
     jobSelect.disabled = true;
     thresholdInput.disabled = true;
     okBtn.disabled = true;
-    resetBtn.disabled = false;  // Reset enabled so user can re-configure
+    resetConfigBtn.disabled = false;  // Reset enabled so user can re-configure
   }
 }
 
@@ -1204,4 +1204,3 @@ function saveUserConfigToBridge(jobId, threshold) {
       showToast("Bridge not connected", 2000);
     }
   }
-
