@@ -778,6 +778,7 @@ class Bridge(QObject):
                     SUM(CASE WHEN LOWER(result) IN ('bad', 'defect', 'strip missing') THEN 1 ELSE 0 END) AS bad
                 FROM REPORT
                 WHERE job_id = ?
+                AND date(created_time) = date('now', 'localtime')
             """, (job_id,))
             print("✅ after execute")
 
@@ -823,6 +824,7 @@ class Bridge(QObject):
                     SUM(CASE WHEN LOWER(result) in ('defect','strip missing') THEN 1 ELSE 0 END) AS bad
                 FROM REPORT
                 WHERE job_id = ?
+                AND date(created_time) = date('now', 'localtime')
             """, (job_id,))
 
             row = cursor.fetchone()
