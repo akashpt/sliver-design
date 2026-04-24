@@ -72,7 +72,7 @@ class Bridge(QObject):
             self.get_system_storage()
 
         # # For testing
-        self.test_image_path = r"/home/texa/Downloads/imgs/good/img_0001.bmp"
+        self.test_image_path = r"/home/texa/Aarthy_data/sliver_alternate/SLIVER_IMAGES/bad_yellow/yellow_5/img_0001.bmp"
         self.test_frame = cv2.imread(self.test_image_path)
 
     # ====================== CAMERA ======================
@@ -303,7 +303,7 @@ class Bridge(QObject):
         try:
             frame = None
 
-            # # # For testing
+            # # For testing
             # if self.test_image_path:
             #     frame = cv2.imread(self.test_image_path)
             #     frame = self.test_frame.copy()
@@ -375,7 +375,22 @@ class Bridge(QObject):
                 status = "live_stream"
             else:
                 # status = self.run_detection(frame)
-                status, processed_img, raw_img = self.run_detection(frame)
+                # status, processed_img, raw_img = self.run_detection(frame)
+                status, processed_img, raw_img, bad_count, bad_indices = self.run_detection(frame)
+            
+            total_strips = self.detector.expected_strip_count
+
+            if status == "strip missing":
+                bad_strips = bad_count
+                bad_strip_number = "missing"
+
+            elif status == "defect":
+                bad_strips = bad_count
+                bad_strip_number = ",".join(map(str, bad_indices))
+
+            else:
+                bad_strips = 0
+                bad_strip_number = ""
 
 
             bad_image_path = None
@@ -471,7 +486,15 @@ class Bridge(QObject):
                         print(f"Saved: {file_path}")
 
             if self.process == "prediction":
-                self.save_report_entry(status, bad_image_path)
+                # self.save_report_entry(status, bad_image_path)
+                self.save_report_entry(
+                            status,
+                            bad_image_path,
+                            total_strips,
+                            bad_strips,
+                            bad_strip_number
+                        )
+
 
             # =========================
             # SEND TO UI
@@ -504,7 +527,7 @@ class Bridge(QObject):
             self.detector.color_threshold = float(threshold)
 
         # Prediction file function
-        status, processed_img, raw_img, _, _ = self.detector.process_image(frame, model_key)
+        status, processed_img, raw_img, bad_count, bad_indices = self.detector.process_image(frame, model_key)
 
         # Update counts
         if status == "good":
@@ -519,7 +542,7 @@ class Bridge(QObject):
         # if processed_img is not None:
         #     self.current_frame = processed_img
 
-        return status,processed_img, raw_img
+        return status,processed_img, raw_img, bad_count, bad_indices
 
     def get_model_job_ids(self):
         try:
@@ -597,7 +620,7 @@ class Bridge(QObject):
 
             return json.dumps(data)
 
-    def save_report_entry(self, result_status, bad_image_path=""):
+    def save_report_entry(self, result_status, bad_image_path="", total_strips=0,bad_strips=0,bad_strip_number=""):
         try:
             job_id, threshold = self.get_job_from_config()
 
@@ -627,9 +650,9 @@ class Bridge(QObject):
                 job_id,
                 str(threshold) if threshold is not None else "",
                 result_status,
-                0,
-                0,
-                "",
+                total_strips,
+                bad_strips,
+                bad_strip_number,
                 bad_image_path,
             ))
 
