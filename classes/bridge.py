@@ -1157,10 +1157,22 @@ class Bridge(QObject):
 # invoice viewer slot 
     @pyqtSlot()
     def openInvoiceViewer(self):
-        from classes.invoice_viewer import InvoiceViewer
-        viewer = InvoiceViewer()
-        viewer.exec_()
-        
+        try:
+            from classes.invoice_pdf import InvoicePDFGenerator
+            from classes.invoice_viewer import InvoiceViewer
+
+            ok = InvoicePDFGenerator().generate_pdf()
+
+            if not ok:
+                print("❌ Invoice PDF generation failed")
+                return
+
+            viewer = InvoiceViewer()
+            viewer.exec_()
+
+        except Exception as e:
+            print("❌ openInvoiceViewer error:", e)
+            
     # Navigation
     @pyqtSlot()
     def goHome(self):
