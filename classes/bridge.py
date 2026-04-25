@@ -1114,19 +1114,24 @@ class Bridge(QObject):
             print("❌ load_email_template error:", e)
             return ""
 
-    @pyqtSlot(result=str)
+    def to_gb(self,value):
+        return round(value / (1024 ** 3), 2)
+    
+    # @pyqtSlot(result=str)
     def get_system_storage(self):
         try:
             total, used, free = shutil.disk_usage("/")
-            used = used + 23.84 * (1024 ** 3)  # add hidden usage to used
-
-            def to_gb(value):
-                return round(value / (1024 ** 3), 2)
-
+            total_gp = self.to_gb(total)
+            used_gp = self.to_gb(used)
+            free_gp = self.to_gb(free)
+            hidden_gp = total_gp -(used_gp + free_gp)
             data = {
-                "total_gb": to_gb(total),
-                "used_gb": to_gb(used),
-                "free_gb": to_gb(free),
+                "total_gb": total_gp,
+                "used_gb": used_gp + hidden_gp,
+                "free_gb": free_gp,
+                "total_gb": total_gp,
+                "used_gb": used_gp + hidden_gp,
+                "free_gb": free_gp,
                 "used_percent": round((used ) / total * 100, 1) if total > 0 else 0,
                 "free_percent": round((free / total) * 100, 1) if total > 0 else 0,
                 "updated_at": datetime.now().isoformat()
