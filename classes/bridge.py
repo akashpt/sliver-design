@@ -313,46 +313,46 @@ class Bridge(QObject):
         try:
             frame = None
 
-            # For testing
-            if self.test_image_path:
-                frame = cv2.imread(self.test_image_path)
-                frame = self.test_frame.copy()
+            # # For testing
+            # if self.test_image_path:
+            #     frame = cv2.imread(self.test_image_path)
+            #     frame = self.test_frame.copy()
+
+            #     if frame is None:
+            #         print("Test image not found")
+            #         return
+
+
+            # =========================
+            # MINDVISION CAMERA
+            # =========================
+            if self.use_mindvision and self.camera:
+                frame = self.camera.get_frame()
 
                 if frame is None:
-                    print("Test image not found")
+                    print("⚠️ MindVision lost → switching to webcam")
+                    self.use_mindvision = False
+                    self.cap = cv2.VideoCapture(0)
                     return
 
 
-            # # =========================
-            # # MINDVISION CAMERA
-            # # =========================
-            # if self.use_mindvision and self.camera:
-            #     frame = self.camera.get_frame()
+                # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            #     if frame is None:
-            #         print("⚠️ MindVision lost → switching to webcam")
-            #         self.use_mindvision = False
-            #         self.cap = cv2.VideoCapture(0)
-            #         return
+            # =========================
+            # WEBCAM
+            # =========================
+            elif self.cap:
+                ret, frame = self.cap.read()
+                if not ret:
+                    return
 
-
-            #     # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-            # # =========================
-            # # WEBCAM
-            # # =========================
-            # elif self.cap:
-            #     ret, frame = self.cap.read()
-            #     if not ret:
-            #         return
-
-            # else:
-            #     return
+            else:
+                return
 
             # =========================
             # 🔥 ROTATE FRAME
             # =========================
-            # frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
             # =========================defect_path
             # SAVE CURRENT FRAME
@@ -561,13 +561,26 @@ class Bridge(QObject):
         # Prediction file function
         status, processed_img, raw_img, bad_count, bad_indices = self.detector.process_image(frame, model_key)
 
-        # Update counts
+        # # Update counts
+        # if status == "good":
+        #     self.good += 1
+        # elif status == "defect":
+        #     self.bad += 1
+        # else :
+        #     self.bad +=1
+
+        # Ignore black pixels
         if status == "good":
             self.good += 1
-        elif status == "defect":
+
+        elif status in ["defect", "strip missing"]:
             self.bad += 1
-        else :
-            self.bad +=1
+
+        elif status == "ignored":
+            pass   # do not count
+
+        else:
+            pass
 
 
         # Replace frame with processed image 
