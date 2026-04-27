@@ -37,6 +37,7 @@ class Bridge(QObject):
         self.use_mindvision = False
         self.camera_open = False
         self.current_frame = None
+        self.defect_active = False
         self.training_running = False
         self.training_folder_name = ""
         self.training_save_interval = 1000   # milliseconds
@@ -285,7 +286,7 @@ class Bridge(QObject):
         print("✅ Camera fully stopped")
         # all lights off when camera stops
         turn_off_greenlight()
-        turn_off_redlight()
+        # turn_off_redlight()
         # turn_off_whitelight()
         # self.insert_report()
 
@@ -401,14 +402,14 @@ class Bridge(QObject):
                 turn_off_greenlight()
                 turn_on_redlight()
                 print("⚠️ STRIP MISSING: Green light OFF, Red light ON")
-
+                
             elif status == "defect":
                 bad_strips = bad_count
                 bad_strip_number = ",".join(map(str, bad_indices))
                 turn_off_greenlight()
                 turn_on_redlight()
                 print(f"🔴 DEFECT: Green light OFF, Red light ON - Bad strip No: {bad_strip_number}")
-
+                
             else:
                 bad_strips = 0
                 bad_strip_number = ""
@@ -505,17 +506,21 @@ class Bridge(QObject):
                             daemon=True
                         ).start()
                         print(f"Saved: {file_path}")
-                        defect_payload = {
-                            "status": status,
-                            "defect_type": status,
-                            "image_path": str(file_path),
-                            "time": defect_time
-                        }
+                        self.emit_defect_payload(status, file_path)
+                        self.stopCamera()
+                        return
+                        # defect_payload = {
+                        #     "status": status,
+                        #     "defect_type": status,
+                        #     "image_path": str(file_path),
+                        #     "time": defect_time
+                        # }
 
-                        self.defect_signal.emit(json.dumps(defect_payload))
+                        # self.defect_signal.emit(json.dumps(defect_payload))
+                        
 
                         # stop prediction after defect
-                        self.stopCamera()
+                        
 
             if self.process == "prediction":
                 # self.save_report_entry(status, bad_image_path)
@@ -575,6 +580,26 @@ class Bridge(QObject):
         #     self.current_frame = processed_img
 
         return status,processed_img, raw_img, bad_count, bad_indices
+    
+    def emit_defect_payload(self, status, file_path):
+        try:
+            turn_off_greenlight()
+            turn_on_redlight()
+            print("🔴 Defect popup showing: Green OFF, Red ON")
+
+            defect_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+
+            payload = {
+                "status": status,
+                "defect_type": status,
+                "image_path": str(file_path),
+                "time": defect_time
+            }
+
+            self.defect_signal.emit(json.dumps(payload))
+
+        except Exception as e:
+            print("❌ emit_defect_payload error:", e)
 
     def get_model_job_ids(self):
         try:
