@@ -13,6 +13,7 @@ from path import *
 from classes.training import StripColorTraining
 from classes.prediction import StripColorPrediction
 # from classes.report import ReportManager
+from classes.modbus_relay_code import *
 
 class Bridge(QObject):
 
@@ -55,6 +56,9 @@ class Bridge(QObject):
         self.inspected = 0
         self.good = 0
         self.bad = 0
+
+        self.green_light_on = False
+        self.red_active = False
 
         # Config file path
         # config_dir = QStandardPaths.writableLocation(QStandardPaths.AppConfigLocation)
@@ -278,6 +282,21 @@ class Bridge(QObject):
         self.camera_open = False
         print("✅ Camera fully stopped")
         # self.insert_report()
+
+        # 🔥 ADD THIS BLOCK
+        try:
+            turn_off_greenlight()
+            turn_off_redlight()
+
+            self.green_light_on = False
+            self.red_active = False
+
+            print("🛑 Lights OFF (Stop button)")
+
+        except Exception as e:
+            print("❌ Modbus stop error:", e)
+
+        print("✅ Camera fully stopped")
 
     def count_show(self):
         job_id, _ = self.get_job_from_config()
@@ -527,6 +546,17 @@ class Bridge(QObject):
 
         # Prediction file function
         status, processed_img, raw_img, bad_count, bad_indices = self.detector.process_image(frame, model_key)
+        try:
+            if status == "good":
+                if not self.green_light_on and not self.red_active:
+                    turn_on_greenlight()
+                    self.green_light_on = True
+
+            elif status in ["defect", "strip missing"]:
+                self.handle_defect_signal()
+
+        except Exception as e:
+            print("❌ Modbus error:", e)
 
         # Update counts
         if status == "good":
@@ -542,6 +572,37 @@ class Bridge(QObject):
         #     self.current_frame = processed_img
 
         return status,processed_img, raw_img, bad_count, bad_indices
+    
+    def handle_defect_signal(self):
+        if self.red_active:
+            return  # already running, avoid repeat
+
+        self.red_active = True
+
+        try:
+            turn_off_greenlight()
+            turn_on_redlight()
+            print("🔴 Red ON")
+        except Exception as e:
+            print("❌ Modbus error:", e)
+
+        # After 1 second → turn OFF red and enable green
+        QTimer.singleShot(1000, self.reset_after_defect)
+    
+    def reset_after_defect(self):
+        try:
+            turn_off_redlight()
+            print("🔴 Red OFF")
+
+            turn_on_greenlight()
+            print("🟢 Green ON")
+
+            self.green_light_on = True
+
+        except Exception as e:
+            print("❌ Reset error:", e)
+
+        self.red_active = False
 
     def get_model_job_ids(self):
         try:
