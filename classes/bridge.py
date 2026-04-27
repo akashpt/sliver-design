@@ -417,7 +417,7 @@ class Bridge(QObject):
                     file_path = defect_folder / f"defect_{timestamp}.jpg"
 
                     # raw image path
-                    raw_path = raw_folder / f"raw_{timestamp}.jpg"
+                    raw_path = raw_folder / f"raw_{timestamp}.bmp"
 
 
                     # filename = f"defect_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.jpg"
@@ -436,7 +436,6 @@ class Bridge(QObject):
                         cv2.imwrite(str(raw_path), raw_img)
                     else:
                         cv2.imwrite(str(raw_path), self.current_frame)
-
 
                     if saved:
                         from classes.send_mail import send_email_with_attachments
@@ -820,11 +819,10 @@ class Bridge(QObject):
             cursor.execute("""
                 SELECT 
                     COUNT(*) AS inspected,
-                    SUM(CASE WHEN LOWER(result) = 'good' THEN 1 ELSE 0 END) AS good,
-                    SUM(CASE WHEN LOWER(result) in ('defect','strip missing') THEN 1 ELSE 0 END) AS bad
+                    COALESCE(SUM(CASE WHEN LOWER(result) = 'good' THEN 1 ELSE 0 END), 0) AS good,
+                    COALESCE(SUM(CASE WHEN LOWER(result) IN ('defect','strip missing') THEN 1 ELSE 0 END), 0) AS bad
                 FROM REPORT
                 WHERE job_id = ?
-                AND date(created_time) = date('now', 'localtime')
             """, (job_id,))
 
             row = cursor.fetchone()

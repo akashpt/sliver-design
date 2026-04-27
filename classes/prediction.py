@@ -86,7 +86,7 @@ class StripColorPrediction:
             while y2 < height - 1 and projection[y2] > threshold:
                 y2 += 1
 
-            fixed_height = 15
+            fixed_height = 12
             mid = (y1 + y2) // 2
 
             new_y1 = max(0, mid - fixed_height // 2)
@@ -102,7 +102,7 @@ class StripColorPrediction:
 
     # ---------------- PROCESS IMAGE ----------------
     def process_frame(self, img, model_data):
-
+        full_img = img.copy()
         img = cv2.resize(img, (640, 480))
         height, width = img.shape[:2]
         
@@ -113,7 +113,39 @@ class StripColorPrediction:
         strips = self.detect_horizontal_strips(img)
 
         if len(strips) != self.expected_strip_count:
-            return "strip missing", vis, vis, 0, []
+                found = len(strips)
+                expected = self.expected_strip_count
+
+                msg = f"Strip Missing  |  Found: {found} / Expected: {expected}"
+
+                overlay = vis.copy()
+
+                bar_height = 60
+
+                # --- Top full-width bar ---
+                cv2.rectangle(overlay, (0, 0), (width, bar_height), (20, 20, 20), -1)
+
+                # --- Transparency ---
+                cv2.addWeighted(overlay, 0.6, vis, 0.4, 0, vis)
+
+                # --- Text settings ---
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                scale = 0.7
+                thickness = 2
+
+                (text_w, text_h), _ = cv2.getTextSize(msg, font, scale, thickness)
+
+                # --- Center text ---
+                text_x = (width - text_w) // 2
+                text_y = (bar_height + text_h) // 2 - 5
+
+                # --- Optional white outline (for better visibility) ---
+                cv2.putText(vis, msg, (text_x, text_y), font, scale, (255, 255, 255), 3, cv2.LINE_AA)
+
+                # --- Main RED text ---
+                cv2.putText(vis, msg, (text_x, text_y), font, scale, (0, 0, 255), 2, cv2.LINE_AA)
+
+                return "strip missing", vis, vis, 0, []
 
 
         strip_lab_values = model_data["strip_lab_values"]
@@ -185,10 +217,10 @@ class StripColorPrediction:
         else:
             status = "defect"
             
-        raw_img = img
+        # raw_img = img
         processed_img = vis
 
-        return status, processed_img, raw_img, bad_strip_count, bad_strip_indices
+        return status, processed_img, full_img, bad_strip_count, bad_strip_indices
 
     # ---------------- ----------------
     def process_image(self, img, model_key):
