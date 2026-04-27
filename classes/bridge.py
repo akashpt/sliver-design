@@ -12,8 +12,8 @@ from classes.mindvision import MindVisionCamera
 from path import *
 from classes.training import StripColorTraining
 from classes.prediction import StripColorPrediction
-# from classes.report import ReportManager
 from classes.modbus_relay_code import *
+# from classes.report import ReportManager
 
 class Bridge(QObject):
 
@@ -57,9 +57,6 @@ class Bridge(QObject):
         self.inspected = 0
         self.good = 0
         self.bad = 0
-
-        self.green_light_on = False
-        self.red_active = False
 
         # Config file path
         # config_dir = QStandardPaths.writableLocation(QStandardPaths.AppConfigLocation)
@@ -214,6 +211,9 @@ class Bridge(QObject):
             return "Camera Already Running"
 
         print("🔥 Starting camera...")
+        turn_off_redlight()
+        turn_on_greenlight()
+        print("🟢 Green light ON, 🔴 Red light OFF - camera started")
 
         job_id, _ = self.get_job_from_config()
         if job_id:
@@ -282,22 +282,10 @@ class Bridge(QObject):
 
         self.camera_open = False
         print("✅ Camera fully stopped")
+        # all lights off when camera stops
+        turn_off_greenlight()
+        turn_off_redlight()
         # self.insert_report()
-
-        # 🔥 ADD THIS BLOCK
-        try:
-            turn_off_greenlight()
-            turn_off_redlight()
-
-            self.green_light_on = False
-            self.red_active = False
-
-            print("🛑 Lights OFF (Stop button)")
-
-        except Exception as e:
-            print("❌ Modbus stop error:", e)
-
-        print("✅ Camera fully stopped")
 
     def count_show(self):
         job_id, _ = self.get_job_from_config()
@@ -399,14 +387,25 @@ class Bridge(QObject):
                 status, processed_img, raw_img, bad_count, bad_indices = self.run_detection(frame)
             
             total_strips = self.detector.expected_strip_count
+            
+            if status == "good":
+                turn_on_greenlight()
+                turn_off_redlight()
+                print("🟢 GOOD: Green light ON, Red light OFF")
 
             if status == "strip missing":
                 bad_strips = bad_count
                 bad_strip_number = "missing"
+                turn_off_greenlight()
+                turn_on_redlight()
+                print("⚠️ STRIP MISSING: Green light OFF, Red light ON")
 
             elif status == "defect":
                 bad_strips = bad_count
                 bad_strip_number = ",".join(map(str, bad_indices))
+                turn_off_greenlight()
+                turn_on_redlight()
+                print(f"🔴 DEFECT: Green light OFF, Red light ON - Bad strip No: {bad_strip_number}")
 
             else:
                 bad_strips = 0
@@ -437,7 +436,7 @@ class Bridge(QObject):
                     file_path = defect_folder / f"defect_{timestamp}.jpg"
 
                     # raw image path
-                    raw_path = raw_folder / f"raw_{timestamp}.bmp"
+                    raw_path = raw_folder / f"raw_{timestamp}.jpg"
 
 
                     # filename = f"defect_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.jpg"
@@ -456,6 +455,7 @@ class Bridge(QObject):
                         cv2.imwrite(str(raw_path), raw_img)
                     else:
                         cv2.imwrite(str(raw_path), self.current_frame)
+
 
                     if saved:
                         from classes.send_mail import send_email_with_attachments
@@ -558,17 +558,6 @@ class Bridge(QObject):
 
         # Prediction file function
         status, processed_img, raw_img, bad_count, bad_indices = self.detector.process_image(frame, model_key)
-        try:
-            if status == "good":
-                if not self.green_light_on and not self.red_active:
-                    turn_on_greenlight()
-                    self.green_light_on = True
-
-            elif status in ["defect", "strip missing"]:
-                self.handle_defect_signal()
-
-        except Exception as e:
-            print("❌ Modbus error:", e)
 
         # Update counts
         if status == "good":
@@ -584,37 +573,6 @@ class Bridge(QObject):
         #     self.current_frame = processed_img
 
         return status,processed_img, raw_img, bad_count, bad_indices
-    
-    def handle_defect_signal(self):
-        if self.red_active:
-            return  # already running, avoid repeat
-
-        self.red_active = True
-
-        try:
-            turn_off_greenlight()
-            turn_on_redlight()
-            print("🔴 Red ON")
-        except Exception as e:
-            print("❌ Modbus error:", e)
-
-        # After 1 second → turn OFF red and enable green
-        QTimer.singleShot(1000, self.reset_after_defect)
-    
-    def reset_after_defect(self):
-        try:
-            turn_off_redlight()
-            print("🔴 Red OFF")
-
-            turn_on_greenlight()
-            print("🟢 Green ON")
-
-            self.green_light_on = True
-
-        except Exception as e:
-            print("❌ Reset error:", e)
-
-        self.red_active = False
 
     def get_model_job_ids(self):
         try:
@@ -892,10 +850,11 @@ class Bridge(QObject):
             cursor.execute("""
                 SELECT 
                     COUNT(*) AS inspected,
-                    COALESCE(SUM(CASE WHEN LOWER(result) = 'good' THEN 1 ELSE 0 END), 0) AS good,
-                    COALESCE(SUM(CASE WHEN LOWER(result) IN ('defect','strip missing') THEN 1 ELSE 0 END), 0) AS bad
+                    SUM(CASE WHEN LOWER(result) = 'good' THEN 1 ELSE 0 END) AS good,
+                    SUM(CASE WHEN LOWER(result) in ('defect','strip missing') THEN 1 ELSE 0 END) AS bad
                 FROM REPORT
                 WHERE job_id = ?
+                AND date(created_time) = date('now', 'localtime')
             """, (job_id,))
 
             row = cursor.fetchone()
