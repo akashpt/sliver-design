@@ -68,6 +68,17 @@ document.addEventListener("DOMContentLoaded", function () {
           currentModalIndex = 0;
           updateModalImage();
 
+          // Show only the single latest defect — hide navigation arrows
+          document.getElementById("prevDefect").style.display = "none";
+          document.getElementById("nextDefect").style.display = "none";
+
+          // Show Restart button (not Close) for live defect alert
+          const alertBtn = document.getElementById("modalRestartBtn");
+          if (alertBtn) {
+            alertBtn.innerHTML = '<i class="fas fa-rotate-right"></i> Restart';
+            alertBtn.onclick = restartFromModal;
+          }
+
           const title = document.querySelector("#defectModal .modal-head-title");
           if (title) {
             title.textContent = `Defect Detected - ${defect.defect_type}`;
@@ -888,6 +899,18 @@ function openDefectModal(index) {
   currentModalIndex = index;
   const modal = document.getElementById("defectModal");
   if (!modal) return;
+
+  // Restore navigation arrows (hidden during live defect alert)
+  document.getElementById("prevDefect").style.display = "";
+  document.getElementById("nextDefect").style.display = "";
+
+  // Show Close button (not Restart) when opened from thumbnail slider
+  const btn = document.getElementById("modalRestartBtn");
+  if (btn) {
+    btn.innerHTML = "Close";
+    btn.onclick = closeDefectModal;
+  }
+
   updateModalImage();
   modal.style.display = "flex";
 }
@@ -926,6 +949,23 @@ function closeDefectModal() {
   document.getElementById("statusLabel").textContent = "STANDBY";
 
   enableSideMenu();
+}
+
+// ─── Restart from Defect Modal ───────────────────────────────────────
+function restartFromModal() {
+  // Close the modal
+  const modal = document.getElementById("defectModal");
+  if (modal) modal.style.display = "none";
+
+  // Restore nav arrows for future thumbnail-click opens
+  document.getElementById("prevDefect").style.display = "";
+  document.getElementById("nextDefect").style.display = "";
+
+  // Reset running flag so startDetection() can proceed
+  isRunning = false;
+
+  // Restart detection immediately
+  startDetection();
 }
 
 // function downloadDefectImage() {
