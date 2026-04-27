@@ -790,7 +790,7 @@ function setUIState(running) {
     resetConfigBtn.disabled = true;   // Reset disabled while running
   } else {
     // Detection stopped: Start is disabled until Reset → re-configure
-    startBtn.disabled = true;   // Must Reset + re-confirm before starting again
+    startBtn.disabled = !(currentJobId && currentThreshold);
     stopBtn.disabled = true;
     jobSelect.disabled = true;
     thresholdInput.disabled = true;
