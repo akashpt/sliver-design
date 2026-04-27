@@ -49,6 +49,42 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       });
 
+      if (bridge.defect_signal) {
+        bridge.defect_signal.connect((data) => {
+          const defect = JSON.parse(data);
+
+          let imgSrc = defect.image_path.replace(/\\/g, "/");
+          if (!imgSrc.startsWith("file:///")) {
+            imgSrc = "file:///" + imgSrc;
+          }
+
+          defectHistory.unshift({
+            time: defect.defect_type || "DEFECT",
+            src: imgSrc,
+          });
+
+          renderDefectThumbs();
+
+          currentModalIndex = 0;
+          updateModalImage();
+
+          const title = document.querySelector("#defectModal .modal-head-title");
+          if (title) {
+            title.textContent = `Defect Detected - ${defect.defect_type}`;
+          }
+
+          const modal = document.getElementById("defectModal");
+          if (modal) modal.style.display = "flex";
+
+          document.getElementById("statusLabel").textContent = "DEFECT STOPPED";
+
+          stopUptime();
+          setUIState(false);
+
+          showToast(`⚠️ Defect Detected: ${defect.defect_type}`, 5000, "error");
+        });
+      }
+
       // 🔥 ADD THIS BELOW counts_signal
       if (bridge.storage_signal) {
         bridge.storage_signal.connect((data) => {
@@ -876,9 +912,20 @@ function changeDefect(direction) {
   updateModalImage();
 }
 
+// function closeDefectModal() {
+//   const modal = document.getElementById("defectModal");
+//   if (modal) modal.style.display = "none";
+// }
 function closeDefectModal() {
   const modal = document.getElementById("defectModal");
   if (modal) modal.style.display = "none";
+
+  document.getElementById("startBtn").disabled = false;
+  document.getElementById("stopBtn").disabled = true;
+  document.getElementById("resetConfigBtn").disabled = false;
+  document.getElementById("statusLabel").textContent = "STANDBY";
+
+  enableSideMenu();
 }
 
 // function downloadDefectImage() {

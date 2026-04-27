@@ -18,7 +18,8 @@ class Bridge(QObject):
 
     frame_signal = pyqtSignal(str)
     counts_signal = pyqtSignal(str)
-    storage_signal = pyqtSignal(str)    
+    storage_signal = pyqtSignal(str)  
+    defect_signal = pyqtSignal(str)   
 
     def __init__(self, app_ref):
         super().__init__()
@@ -72,7 +73,7 @@ class Bridge(QObject):
             self.get_system_storage()
 
         # # For testing
-        self.test_image_path = r"/home/texa/Aarthy_data/sliver_alternate/SLIVER_IMAGES/bad_yellow/yellow_5/img_0001.bmp"
+        self.test_image_path = r"/home/texa_developer/Divya Data/i_sliver-design/img_0001.bmp"
         self.test_frame = cv2.imread(self.test_image_path)
 
     # ====================== CAMERA ======================
@@ -303,46 +304,46 @@ class Bridge(QObject):
         try:
             frame = None
 
-            # # For testing
-            # if self.test_image_path:
-            #     frame = cv2.imread(self.test_image_path)
-            #     frame = self.test_frame.copy()
+            # For testing
+            if self.test_image_path:
+                frame = cv2.imread(self.test_image_path)
+                frame = self.test_frame.copy()
+
+                if frame is None:
+                    print("Test image not found")
+                    return
+
+
+            # # =========================
+            # # MINDVISION CAMERA
+            # # =========================
+            # if self.use_mindvision and self.camera:
+            #     frame = self.camera.get_frame()
 
             #     if frame is None:
-            #         print("Test image not found")
+            #         print("⚠️ MindVision lost → switching to webcam")
+            #         self.use_mindvision = False
+            #         self.cap = cv2.VideoCapture(0)
             #         return
 
 
-            # =========================
-            # MINDVISION CAMERA
-            # =========================
-            if self.use_mindvision and self.camera:
-                frame = self.camera.get_frame()
+            #     # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-                if frame is None:
-                    print("⚠️ MindVision lost → switching to webcam")
-                    self.use_mindvision = False
-                    self.cap = cv2.VideoCapture(0)
-                    return
+            # # =========================
+            # # WEBCAM
+            # # =========================
+            # elif self.cap:
+            #     ret, frame = self.cap.read()
+            #     if not ret:
+            #         return
 
-
-                # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-            # =========================
-            # WEBCAM
-            # =========================
-            elif self.cap:
-                ret, frame = self.cap.read()
-                if not ret:
-                    return
-
-            else:
-                return
+            # else:
+            #     return
 
             # =========================
             # 🔥 ROTATE FRAME
             # =========================
-            frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            # frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
             # =========================defect_path
             # SAVE CURRENT FRAME
@@ -484,6 +485,17 @@ class Bridge(QObject):
                             daemon=True
                         ).start()
                         print(f"Saved: {file_path}")
+                        defect_payload = {
+                            "status": status,
+                            "defect_type": status,
+                            "image_path": str(file_path),
+                            "time": defect_time
+                        }
+
+                        self.defect_signal.emit(json.dumps(defect_payload))
+
+                        # stop prediction after defect
+                        self.stopCamera()
 
             if self.process == "prediction":
                 # self.save_report_entry(status, bad_image_path)
