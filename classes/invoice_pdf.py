@@ -14,6 +14,7 @@ from path import (
     PREDICTION_IMAGES_DIR,
     IMG_DIR,
     TRAINING_SETTINGS_FILE,
+    USER_CONFIG_FILE
 )
 
 
@@ -38,20 +39,36 @@ class InvoicePDFGenerator:
         conn = sqlite3.connect(self.db_path)
         cur = conn.cursor()
 
+        config_path = USER_CONFIG_FILE
+
+        job_id = ""
+
+        if Path(config_path).exists():
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+                job_id = config.get("job_id", "").strip()
+
+        print("PDF FILTER JOB_ID =", job_id)
+        cur.execute("SELECT COUNT(*) FROM REPORT WHERE job_id = ?", (job_id,))
+        print("ONLY JOB ROWS =", cur.fetchone()[0])
+
         cur.execute("""
             SELECT
                 COUNT(*) AS inspected,
                 SUM(CASE WHEN LOWER(COALESCE(result,'')) = 'good' THEN 1 ELSE 0 END) AS good,
                 SUM(CASE WHEN LOWER(COALESCE(result,'')) IN ('defect','bad','strip missing') THEN 1 ELSE 0 END) AS defective,
                 COALESCE(MAX(machine_no), '-') AS machine_no,
-                COALESCE(MAX(job_id), '-') AS job_id,
+                ? AS job_id,
                 COALESCE(MAX(threshold), '-') AS threshold,
                 MIN(created_time) AS start_time,
                 MAX(created_time) AS end_time
             FROM REPORT
             WHERE date(created_time) = date('now', 'localtime')
-        """)
+            AND job_id = ?
+        """, (job_id, job_id))
+
         summary = cur.fetchone()
+        print("PDF SUMMARY =", summary)
 
         cur.execute("""
             SELECT
@@ -64,10 +81,12 @@ class InvoicePDFGenerator:
                 bad_image_path
             FROM REPORT
             WHERE date(created_time) = date('now', 'localtime')
+            AND job_id = ?
             AND LOWER(COALESCE(result,'')) IN ('defect','bad','strip missing')
             ORDER BY datetime(created_time) DESC
-            LIMIT 20
-        """)
+            LIMIT 5
+        """, (job_id,))
+
         defects = cur.fetchall()
 
         conn.close()
@@ -183,9 +202,9 @@ class InvoicePDFGenerator:
 
             html = self.build_html()
 
-            temp_html = Path(INVOICE_PDF).parent / "dynamic_sliver_invoice.html"
-            temp_html.write_text(html, encoding="utf-8")
-            print("Temp HTML:", temp_html)
+            # temp_html = Path(INVOICE_PDF).parent / "dynamic_sliver_invoice.html"
+            # temp_html.write_text(html, encoding="utf-8")
+            # print("Temp HTML:", temp_html)
 
             page = QWebEnginePage()
             loop = QEventLoop()
@@ -203,7 +222,8 @@ class InvoicePDFGenerator:
                 except Exception as e:
                     print("❌ save_pdf error:", e)
 
-                loop.quit()
+                if loop.isRunning():
+                    loop.quit()
 
             def html_loaded(ok):
                 print("HTML loaded:", ok)
@@ -216,23 +236,30 @@ class InvoicePDFGenerator:
                 QTimer.singleShot(1000, lambda: page.printToPdf(save_pdf))
 
             def timeout():
+                print("⚠️ PDF timeout reached")
+
                 if Path(INVOICE_PDF).exists() and Path(INVOICE_PDF).stat().st_size > 0:
-                    print("✅ PDF generated before timeout")
+                    print("✅ Existing PDF found")
                     result["ok"] = True
+                    loop.quit()
+                    return
                 else:
-                    print("❌ PDF generation timeout")
+                    print("❌ PDF not created")
+
                 loop.quit()
 
             page.loadFinished.connect(html_loaded)
-            page.load(QUrl.fromLocalFile(str(temp_html.resolve())))
+            # page.load(QUrl.fromLocalFile(str(temp_html.resolve())))
+            base_url = QUrl.fromLocalFile(str(Path(SLIVER_PDF_PAGE).parent.resolve()) + "/")
+            page.setHtml(html, base_url)
 
-            QTimer.singleShot(60000, timeout)
+            QTimer.singleShot(30000, timeout)
             loop.exec_()
-            try:
-                temp_html.unlink(missing_ok=True)
-                print("🗑 Temp HTML deleted")
-            except Exception as e:
-                print("⚠️ Temp HTML delete failed:", e)
+            # try:
+            #     temp_html.unlink(missing_ok=True)
+            #     print("🗑 Temp HTML deleted")
+            # except Exception as e:
+            #     print("⚠️ Temp HTML delete failed:", e)
 
             return result["ok"]
 
