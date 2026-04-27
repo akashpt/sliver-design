@@ -211,6 +211,7 @@ class Bridge(QObject):
             return "Camera Already Running"
 
         print("🔥 Starting camera...")
+        # turn_on_whitelight()
         turn_off_redlight()
         turn_on_greenlight()
         print("🟢 Green light ON, 🔴 Red light OFF - camera started")
@@ -285,6 +286,7 @@ class Bridge(QObject):
         # all lights off when camera stops
         turn_off_greenlight()
         turn_off_redlight()
+        # turn_off_whitelight()
         # self.insert_report()
 
     def count_show(self):
