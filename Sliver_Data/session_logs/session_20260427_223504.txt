@@ -1,0 +1,9 @@
+job_id: 50s_radha_orange
+threshold: 5
+lastSaved: 27-04-2026 22:35:04
+start time: 27-04-2026 22:34:57
+end time: 27-04-2026 22:35:04
+inspected: 0
+good: 0
+bad: 0
+ignored frame count: 0

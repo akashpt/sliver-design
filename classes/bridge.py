@@ -65,6 +65,11 @@ class Bridge(QObject):
         # self.config_path = os.path.join(config_dir, "userConfig.json")        
         self.config_path= str(USER_CONFIG_FILE)
 
+        # For observation purpose - ignored frames count
+        self.session_start_time = ""
+        self.session_end_time = ""
+        self.ignored_count = 0
+
         # Prediction Class
         self.detector = StripColorPrediction()
 
@@ -75,7 +80,7 @@ class Bridge(QObject):
             self.get_system_storage()
 
         # # For testing
-        self.test_image_path = r"/home/texa_developer/Divya Data/i_sliver-design/img_0001.bmp"
+        self.test_image_path = r"/home/texa/Aarthy_data/detect_strips/50s_radha_orange/defect_raw/defect_raw_9.bmp"
         self.test_frame = cv2.imread(self.test_image_path)
 
     # ====================== CAMERA ======================
@@ -207,6 +212,11 @@ class Bridge(QObject):
     @pyqtSlot(str,result=str)
     def startCamera(self,process):
         self.process = process
+
+        # For obseravtion - ignored frame details
+        self.session_start_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+        self.ignored_count = 0
+
         if self.camera_open:
             print("⚠️ Camera already running")
             return "Camera Already Running"
@@ -290,6 +300,32 @@ class Bridge(QObject):
         # turn_off_whitelight()
         # self.insert_report()
 
+        self.session_end_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+        self.save_session_txt()
+
+    def save_session_txt(self):
+        try:
+            job_id, threshold = self.get_job_from_config()
+
+            file_name = datetime.now().strftime("session_%Y%m%d_%H%M%S.txt")
+            file_path = SESSION_LOG_DIR / file_name   # create path in path.py
+
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(f"job_id: {job_id}\n")
+                f.write(f"threshold: {threshold}\n")
+                f.write(f"lastSaved: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}\n")
+                f.write(f"start time: {self.session_start_time}\n")
+                f.write(f"end time: {self.session_end_time}\n")
+                f.write(f"inspected: {self.inspected}\n")
+                f.write(f"good: {self.good}\n")
+                f.write(f"bad: {self.bad}\n")
+                f.write(f"ignored frame count: {self.ignored_count}\n")
+
+            print("✅ Session txt saved:", file_path)
+
+        except Exception as e:
+            print("❌ save_session_txt error:", e)
+
     def count_show(self):
         job_id, _ = self.get_job_from_config()
 
@@ -314,46 +350,46 @@ class Bridge(QObject):
         try:
             frame = None
 
-            # # For testing
-            # if self.test_image_path:
-            #     frame = cv2.imread(self.test_image_path)
-            #     frame = self.test_frame.copy()
+            # For testing
+            if self.test_image_path:
+                frame = cv2.imread(self.test_image_path)
+                frame = self.test_frame.copy()
 
-            #     if frame is None:
-            #         print("Test image not found")
-            #         return
+                if frame is None:
+                    print("Test image not found")
+                    return
 
 
             # =========================
             # MINDVISION CAMERA
             # =========================
-            if self.use_mindvision and self.camera:
-                frame = self.camera.get_frame()
+            # if self.use_mindvision and self.camera:
+            #     frame = self.camera.get_frame()
 
-                if frame is None:
-                    print("⚠️ MindVision lost → switching to webcam")
-                    self.use_mindvision = False
-                    self.cap = cv2.VideoCapture(0)
-                    return
+            #     if frame is None:
+            #         print("⚠️ MindVision lost → switching to webcam")
+            #         self.use_mindvision = False
+            #         self.cap = cv2.VideoCapture(0)
+            #         return
 
 
-                # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            #     # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            # =========================
-            # WEBCAM
-            # =========================
-            elif self.cap:
-                ret, frame = self.cap.read()
-                if not ret:
-                    return
+            # # =========================
+            # # WEBCAM
+            # # =========================
+            # elif self.cap:
+            #     ret, frame = self.cap.read()
+            #     if not ret:
+            #         return
 
-            else:
-                return
+            # else:
+            #     return
 
-            # =========================
-            # 🔥 ROTATE FRAME
-            # =========================
-            frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            # # =========================
+            # # 🔥 ROTATE FRAME
+            # # =========================
+            # frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
             # =========================defect_path
             # SAVE CURRENT FRAME
@@ -577,6 +613,10 @@ class Bridge(QObject):
         #     self.bad +=1
 
         # Count only valid frames
+
+        if status == "ignored":
+            self.ignored_count += 1
+
         if status != "ignored":
             self.inspected += 1
 
