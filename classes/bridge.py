@@ -522,7 +522,8 @@ class Bridge(QObject):
                         # stop prediction after defect
                         
 
-            if self.process == "prediction":
+            # if self.process == "prediction":
+            if self.process == "prediction" and status != "ignored":
                 # self.save_report_entry(status, bad_image_path)
                 self.save_report_entry(
                             status,
@@ -537,10 +538,11 @@ class Bridge(QObject):
             # SEND TO UI
             # =========================
             # _, buffer = cv2.imencode(".jpg", frame)
-            display_frame = processed_img if processed_img is not None else frame
-            _, buffer = cv2.imencode(".jpg", display_frame)
-            jpg = base64.b64encode(buffer).decode("utf-8")
-            self.frame_signal.emit(jpg)
+            if status != "ignored":
+                display_frame = processed_img if processed_img is not None else frame
+                _, buffer = cv2.imencode(".jpg", display_frame)
+                jpg = base64.b64encode(buffer).decode("utf-8")
+                self.frame_signal.emit(jpg)
 
             # =========================
             # 🔥 RUN DETECTION
@@ -554,8 +556,8 @@ class Bridge(QObject):
 
 
     def run_detection(self, frame):
-         # Every frame is inspected
-        self.inspected += 1
+        # Every frame is inspected
+        # self.inspected += 1
 
         # Get model + threshold
         model_key, threshold = self.get_job_from_config()
@@ -574,18 +576,16 @@ class Bridge(QObject):
         # else :
         #     self.bad +=1
 
-        # Ignore black pixels
+        # Count only valid frames
+        if status != "ignored":
+            self.inspected += 1
+
+        # Good / Bad counts
         if status == "good":
             self.good += 1
 
         elif status in ["defect", "strip missing"]:
             self.bad += 1
-
-        elif status == "ignored":
-            pass   # do not count
-
-        else:
-            pass
 
 
         # Replace frame with processed image 
