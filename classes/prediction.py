@@ -13,7 +13,7 @@ class StripColorPrediction:
 
     def __init__(self, color_threshold=2.0):
 
-        self.expected_strip_count = 7
+        self.expected_strip_count = 8
         self.minimum_strip_gap = 35
         self.center_crop_percent = 0.25
         self.color_threshold = color_threshold
@@ -162,6 +162,38 @@ class StripColorPrediction:
                 results.append("EMPTY")
                 continue
 
+            # -------- BACKGROUND DETECTION --------
+            gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+
+            # dark pixels = background
+            bg_mask = gray_roi < 45
+
+            # find background contours - Find Connected Background Regions
+            contours, _ = cv2.findContours(
+                bg_mask.astype(np.uint8),
+                cv2.RETR_EXTERNAL,
+                cv2.CHAIN_APPROX_SIMPLE
+            )
+
+            for cnt in contours:
+                area = cv2.contourArea(cnt)
+
+                if area > 10:   # ignore tiny noise
+                    bx, by, bw, bh = cv2.boundingRect(cnt)
+
+                    # convert ROI coords -> full image coords
+                    cv2.rectangle(
+                        vis,
+                        (x_start + bx, y1 + by),
+                        (x_start + bx + bw, y1 + by + bh),
+                        (0, 0, 255),   # red
+                        2
+                    )
+
+                    print("frame ignored because of bg")
+
+                    return "ignored", vis, img, 0, []
+
             # -------- LAB MEAN --------
             lab = cv2.cvtColor(roi, cv2.COLOR_BGR2LAB)
 
@@ -207,6 +239,8 @@ class StripColorPrediction:
             )
 
             results.append(status)
+
+        print("frame entered prediction")
 
         # -------- FINAL return --------
         bad_strip_indices = [i for i, r in enumerate(results, 1) if r == "DEFECT"]
