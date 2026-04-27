@@ -17,7 +17,6 @@ from path import (
     USER_CONFIG_FILE
 )
 
-
 class InvoicePDFGenerator:
     def __init__(self):
         self.db_path = str(DB_FILE)
@@ -84,7 +83,7 @@ class InvoicePDFGenerator:
             AND job_id = ?
             AND LOWER(COALESCE(result,'')) IN ('defect','bad','strip missing')
             ORDER BY datetime(created_time) DESC
-            LIMIT 5
+            LIMIT 20
         """, (job_id,))
 
         defects = cur.fetchall()
@@ -199,6 +198,16 @@ class InvoicePDFGenerator:
             print("🔥 Invoice PDF generation started")
             # print("HTML Template:", SLIVER_PDF_PAGE)
             print("Output PDF:", INVOICE_PDF)
+            # ✅ Always remove old PDF before generating new PDF
+            pdf_path = Path(INVOICE_PDF)
+            if pdf_path.exists():
+                try:
+                    pdf_path.unlink()
+                    print("🗑 Old invoice PDF deleted")
+                except Exception as e:
+                    print("❌ Cannot delete old PDF:", e)
+                    return False
+                        
 
             html = self.build_html()
 
@@ -237,29 +246,31 @@ class InvoicePDFGenerator:
 
             def timeout():
                 print("⚠️ PDF timeout reached")
+                result["ok"] = False
 
-                if Path(INVOICE_PDF).exists() and Path(INVOICE_PDF).stat().st_size > 0:
-                    print("✅ Existing PDF found")
-                    result["ok"] = True
+                if loop.isRunning():
                     loop.quit()
-                    return
-                else:
-                    print("❌ PDF not created")
 
-                loop.quit()
+            # def timeout():
+            #     print("⚠️ PDF timeout reached")
+
+            #     if Path(INVOICE_PDF).exists() and Path(INVOICE_PDF).stat().st_size > 0:
+            #         print("✅ Existing PDF found")
+            #         result["ok"] = True
+            #         loop.quit()
+            #         return
+            #     else:
+            #         print("❌ PDF not created")
+
+            #     loop.quit()
 
             page.loadFinished.connect(html_loaded)
             # page.load(QUrl.fromLocalFile(str(temp_html.resolve())))
             base_url = QUrl.fromLocalFile(str(Path(SLIVER_PDF_PAGE).parent.resolve()) + "/")
             page.setHtml(html, base_url)
 
-            QTimer.singleShot(30000, timeout)
+            QTimer.singleShot(20000, timeout)
             loop.exec_()
-            # try:
-            #     temp_html.unlink(missing_ok=True)
-            #     print("🗑 Temp HTML deleted")
-            # except Exception as e:
-            #     print("⚠️ Temp HTML delete failed:", e)
 
             return result["ok"]
 

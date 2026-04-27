@@ -63,7 +63,7 @@ class StripColorTraining:
             while y2 < height - 1 and projection[y2] > threshold_value:
                 y2 += 1
 
-            fixed_height = 15
+            fixed_height = 12
             mid = (y1 + y2) // 2
 
             new_y1 = max(0, mid - fixed_height // 2)
