@@ -84,7 +84,7 @@ class Bridge(QObject):
             self.get_system_storage()
 
         # For testing
-        self.test_image_path = r"/home/texa_developer/Divya Data/i_sliver-design/img_0001.bmp"
+        self.test_image_path = r"/home/texa_developer/Divya Data/i_sliver-design/strips.bmp"
         self.test_frame = cv2.imread(self.test_image_path)
 
     # ====================== SAVE USER CONFIG ======================
@@ -353,46 +353,46 @@ class Bridge(QObject):
         try:
             frame = None
 
-            # # For testing
-            # if self.test_image_path:
-            #     frame = cv2.imread(self.test_image_path)
-            #     frame = self.test_frame.copy()
+            # For testing
+            if self.test_image_path:
+                frame = cv2.imread(self.test_image_path)
+                frame = self.test_frame.copy()
+
+                if frame is None:
+                    print("Test image not found")
+                    return
+
+
+            # # # =========================
+            # # # MINDVISION CAMERA
+            # # # =========================
+            # if self.use_mindvision and self.camera:
+            #     frame = self.camera.get_frame()
 
             #     if frame is None:
-            #         print("Test image not found")
+            #         print("⚠️ MindVision lost → switching to webcam")
+            #         self.use_mindvision = False
+            #         self.cap = cv2.VideoCapture(0)
             #         return
 
 
-            # # =========================
-            # # MINDVISION CAMERA
-            # # =========================
-            if self.use_mindvision and self.camera:
-                frame = self.camera.get_frame()
+            #     # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-                if frame is None:
-                    print("⚠️ MindVision lost → switching to webcam")
-                    self.use_mindvision = False
-                    self.cap = cv2.VideoCapture(0)
-                    return
+            # # # =========================
+            # # # WEBCAM
+            # # # =========================
+            # elif self.cap:
+            #     ret, frame = self.cap.read()
+            #     if not ret:
+            #         return
 
-
-                # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-            # # =========================
-            # # WEBCAM
-            # # =========================
-            elif self.cap:
-                ret, frame = self.cap.read()
-                if not ret:
-                    return
-
-            else:
-                return
+            # else:
+            #     return
 
             # =========================
             # 🔥 ROTATE FRAME
             # =========================
-            frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            # frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
             # =========================defect_path
             # SAVE CURRENT FRAME
             # =========================
@@ -559,23 +559,31 @@ class Bridge(QObject):
                         
 
             # if self.process == "prediction":
+                        if self.process == "prediction" and status != "ignored":
+                            self.save_report_entry(
+                                status,
+                                bad_image_path,
+                                total_strips,
+                                bad_strips,
+                                bad_strip_number
+                            )
+
+                        print("✅ DEFECT REPORT SAVED")
+                        print("saved image path =", file_path)
+                        print("db image path =", bad_image_path)
+                        self.emit_defect_payload(status, file_path)
+                        self.stopCamera()
+                        return
+
             if self.process == "prediction" and status != "ignored":
-                # self.save_report_entry(status, bad_image_path)
-                self.save_report_entry(
-                            status,
-                            bad_image_path,
-                            total_strips,
-                            bad_strips,
-                            bad_strip_number
-                        )
-            print("✅ DEFECT REPORT SAVED")
-            print("saved image path =", file_path)
-            print("db image path =", bad_image_path)
-            self.emit_defect_payload(status, file_path)
-            self.stopCamera()
-            return
-
-
+                            # self.save_report_entry(status, bad_image_path)
+                            self.save_report_entry(
+                                        status,
+                                        bad_image_path,
+                                        total_strips,
+                                        bad_strips,
+                                        bad_strip_number
+                                    )
             # =========================
             # SEND TO UI
             # =========================
