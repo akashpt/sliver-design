@@ -96,6 +96,8 @@ CONTROLLER_SETTINGS_FILE = RUN_DIR / "controller_setting.json"
 SIGNAL_FILE = RUN_DIR / "signal.txt"
 COUNT_FILE = RUN_DIR / "count.txt"
 
+SESSION_LOG_DIR = RUN_DIR / "session_logs"
+SESSION_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # =====================================================
 # ENSURE DIRECTORIES
