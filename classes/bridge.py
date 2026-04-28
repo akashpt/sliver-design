@@ -84,7 +84,7 @@ class Bridge(QObject):
             self.get_system_storage()
 
         # For testing
-        self.test_image_path = r"/home/texa/Aarthy_data/detect_strips/50s_radha_orange/defect_raw/defect_raw_9.bmp"
+        self.test_image_path = r"/home/texa_developer/Divya Data/i_sliver-design/strips.bmp"
         self.test_frame = cv2.imread(self.test_image_path)
 
     # ====================== SAVE USER CONFIG ======================
@@ -304,9 +304,7 @@ class Bridge(QObject):
         # self.insert_report()
 
         self.session_end_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-        if self.process == "prediction":
-            self.save_session_txt()
-            print("✅ Prediction session file created")
+        self.save_session_txt()
 
     def save_session_txt(self):
         try:
@@ -355,46 +353,46 @@ class Bridge(QObject):
         try:
             frame = None
 
-            # # For testing
-            # if self.test_image_path:
-            #     frame = cv2.imread(self.test_image_path)
-            #     frame = self.test_frame.copy()
+            # For testing
+            if self.test_image_path:
+                frame = cv2.imread(self.test_image_path)
+                frame = self.test_frame.copy()
+
+                if frame is None:
+                    print("Test image not found")
+                    return
+
+
+            # # # =========================
+            # # # MINDVISION CAMERA
+            # # # =========================
+            # if self.use_mindvision and self.camera:
+            #     frame = self.camera.get_frame()
 
             #     if frame is None:
-            #         print("Test image not found")
+            #         print("⚠️ MindVision lost → switching to webcam")
+            #         self.use_mindvision = False
+            #         self.cap = cv2.VideoCapture(0)
             #         return
 
 
-            # # =========================
-            # # MINDVISION CAMERA
-            # # =========================
-            if self.use_mindvision and self.camera:
-                frame = self.camera.get_frame()
+            #     # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-                if frame is None:
-                    print("⚠️ MindVision lost → switching to webcam")
-                    self.use_mindvision = False
-                    self.cap = cv2.VideoCapture(0)
-                    return
+            # # # =========================
+            # # # WEBCAM
+            # # # =========================
+            # elif self.cap:
+            #     ret, frame = self.cap.read()
+            #     if not ret:
+            #         return
 
-
-                # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-            # # =========================
-            # # WEBCAM
-            # # =========================
-            elif self.cap:
-                ret, frame = self.cap.read()
-                if not ret:
-                    return
-
-            else:
-                return
+            # else:
+            #     return
 
             # =========================
             # 🔥 ROTATE FRAME
             # =========================
-            frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            # frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
             # =========================defect_path
             # SAVE CURRENT FRAME
             # =========================

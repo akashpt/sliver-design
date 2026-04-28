@@ -8,7 +8,7 @@ from PyQt5.QtCore import QUrl, QEventLoop, QTimer
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from path import (
     DB_FILE,
-    SLIVER_PDF_PAGE,
+    REPORT_NEW,
     INVOICE_PDF,
     PREDICTION_IMAGES_DIR,
     IMG_DIR,
@@ -54,7 +54,8 @@ class InvoicePDFGenerator:
             SELECT
                 COUNT(*) AS inspected,
                 SUM(CASE WHEN LOWER(COALESCE(result,'')) = 'good' THEN 1 ELSE 0 END) AS good,
-                SUM(CASE WHEN LOWER(COALESCE(result,'')) IN ('defect','bad','strip missing') THEN 1 ELSE 0 END) AS defective,
+                SUM(CASE WHEN LOWER(COALESCE(result,'')) IN ('defect','bad') THEN 1 ELSE 0 END) AS defective,
+                SUM(CASE WHEN LOWER(COALESCE(result,'')) = 'strip missing' THEN 1 ELSE 0 END) AS missing,
                 COALESCE(MAX(machine_no), '-') AS machine_no,
                 ? AS job_id,
                 COALESCE(MAX(threshold), '-') AS threshold,
@@ -95,10 +96,10 @@ class InvoicePDFGenerator:
         return re.sub(pattern, rf'\1{rows_html}\3', html, flags=re.S)
 
     def build_html(self):
-        html = Path(SLIVER_PDF_PAGE).read_text(encoding="utf-8")
+        html = Path(REPORT_NEW).read_text(encoding="utf-8")
 
         logo_path = self._file_uri(IMG_DIR / "logo" / "logo.png")
-        html = html.replace('src="img/logo.png"', f'src="{logo_path}"')
+        html = re.sub(r'src=".*logo\.png"', f'src="{logo_path}"', html)
 
         training = self._read_training_settings()
         summary, defects = self._fetch_report_data()
@@ -106,11 +107,12 @@ class InvoicePDFGenerator:
         inspected = summary[0] or 0
         good = summary[1] or 0
         defective = summary[2] or 0
-        machine_no = summary[3] or "-"
-        job_id = summary[4] or "-"
-        threshold = summary[5] or "-"
-        start_time = summary[6] or "-"
-        end_time = summary[7] or "-"
+        missing = summary[3] or 0
+        machine_no = summary[4] or "-"
+        job_id = summary[5] or "-"
+        threshold = summary[6] or "-"
+        start_time = summary[7] or "-"
+        end_time = summary[8] or "-"
 
         today = datetime.now().strftime("%Y-%m-%d")
         generated = datetime.now().strftime("%d %B %Y %H:%M:%S")
@@ -125,20 +127,22 @@ class InvoicePDFGenerator:
         <tr><td>Material Name</td><td>{job_id}</td></tr>
         <tr><td>Yarn</td><td>{yarn}</td></tr>
         <tr><td>Color</td><td>{color}</td></tr>
-        <tr><td>Counts</td><td>{count}</td></tr>
-        <tr><td>Threshold</td><td>{threshold}</td></tr>
-        <tr><td>Total Inspected</td><td>{inspected}</td></tr>
-        <tr><td>Good</td><td>{good}</td></tr>
-        <tr><td>Defective</td><td>{defective}</td></tr>
         <tr><td>Start Time</td><td>{start_time}</td></tr>
         <tr><td>End Time</td><td>{end_time}</td></tr>
         """
-
         breakdown_rows = f"""
-        <tr><th style="width: 50%">Category</th><th>Count</th></tr>
-        <tr><td><strong>Total Inspected</strong></td><td style="font-size: 15.5pt; font-weight: 700">{inspected}</td></tr>
-        <tr><td>Good</td><td>{good}</td></tr>
-        <tr><td>Defective</td><td>{defective}</td></tr>
+        <tr>
+        <th>Total Inspected</th>
+        <th>Good</th>
+        <th>Strip Defect</th>
+        <th>Strip Missing</th>
+        </tr>
+        <tr>
+        <td>{inspected}</td>
+        <td>{good}</td>
+        <td>{defective}</td>
+        <td>{missing}</td>
+        </tr>
         """
 
         defect_rows = ""
@@ -204,7 +208,7 @@ class InvoicePDFGenerator:
 
             from path import TEMPLATES_DIR
             temp_html = TEMPLATES_DIR / "dynamic_sliver_invoice.html"
-            temp_html.write_text(html, encoding="utf-8")
+            temp_html.write_text(html, encoding="utf-8")    
             print("Temp HTML:", temp_html)
 
             self.view = QWebEngineView(parent)
@@ -251,3 +255,16 @@ class InvoicePDFGenerator:
             print("❌ generate_pdf error:", e)
             if finished_callback:
                 finished_callback(False)
+
+
+
+
+
+
+
+        # <tr><td>Counts</td><td>{count}</td></tr>
+        # <tr><td>Threshold</td><td>{threshold}</td></tr>
+        # <tr><td>Total Inspected</td><td>{inspected}</td></tr>
+        # <tr><td>Good</td><td>{good}</td></tr>
+        # <tr><td>Defective</td><td>{defective}</td></tr>
+        # SUM(CASE WHEN LOWER(COALESCE(result,'')) IN ('defect','bad','strip missing') THEN 1 ELSE 0 END) AS defective,

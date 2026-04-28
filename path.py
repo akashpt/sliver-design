@@ -50,6 +50,7 @@ INDEX_PAGE = TEMPLATES_DIR / "index.html"
 TRAINING_PAGE = TEMPLATES_DIR / "training.html"
 CONTROLLER_PAGE = TEMPLATES_DIR / "controller.html"
 REPORT_PAGE = TEMPLATES_DIR / "report.html"
+REPORT_NEW = TEMPLATES_DIR / "report_new.html"
 SLIVER_PDF_PAGE = TEMPLATES_DIR / "sliver_invoice.html"
 EMAIL_PAGE = TEMPLATES_DIR / "email.html"
 # CONFIG (READ-ONLY SDK FILES)
