@@ -1,9 +1,0 @@
-job_id: 001_COTTON_TRIAL
-threshold: 1
-lastSaved: 28-04-2026 10:17:43
-start time: 28-04-2026 10:17:41
-end time: 28-04-2026 10:17:43
-inspected: 1
-good: 0
-bad: 1
-ignored frame count: 0

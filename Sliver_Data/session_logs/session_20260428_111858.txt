@@ -1,9 +1,0 @@
-job_id: 40_radha_white
-threshold: 2
-lastSaved: 28-04-2026 11:18:58
-start time: 28-04-2026 11:18:48
-end time: 28-04-2026 11:18:58
-inspected: 9
-good: 9
-bad: 0
-ignored frame count: 0

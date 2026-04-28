@@ -57,8 +57,8 @@ class Bridge(QObject):
         self.count_time.start(1000)
         self.pdf_mail_timer = QTimer()
         self.pdf_mail_timer.timeout.connect(self.send_hourly_pdf_mail)
-        self.pdf_mail_timer.start(60 * 60 * 1000)  # 1 hour
-        # self.pdf_mail_timer.start(10000)  # 10 seconds (testing)
+        # self.pdf_mail_timer.start(60 * 60 * 1000)  # 1 hour
+        self.pdf_mail_timer.start(10000)  # 10 seconds (testing)
         self.inspected = 0
         self.good = 0
         self.bad = 0
