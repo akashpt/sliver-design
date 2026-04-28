@@ -13,7 +13,7 @@ class StripColorPrediction:
 
     def __init__(self, color_threshold=2.0):
 
-        self.expected_strip_count = 8
+        self.expected_strip_count = 7
         self.minimum_strip_gap = 35
         self.center_crop_percent = 0.25
         self.color_threshold = color_threshold
