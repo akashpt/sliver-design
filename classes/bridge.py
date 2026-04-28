@@ -57,8 +57,8 @@ class Bridge(QObject):
         self.count_time.start(1000)
         self.pdf_mail_timer = QTimer()
         self.pdf_mail_timer.timeout.connect(self.send_hourly_pdf_mail)
-        # self.pdf_mail_timer.start(60 * 60 * 1000)  # 1 hour
-        self.pdf_mail_timer.start(10000)  # 10 seconds (testing)
+        self.pdf_mail_timer.start(60 * 60 * 1000)  # 1 hour
+        # self.pdf_mail_timer.start(10000)  # 10 seconds (testing)
         self.inspected = 0
         self.good = 0
         self.bad = 0
@@ -84,7 +84,7 @@ class Bridge(QObject):
             self.get_system_storage()
 
         # For testing
-        self.test_image_path = r"/home/texa_developer/Divya Data/i_sliver-design/strips.jpeg"
+        self.test_image_path = r"/home/texa_developer/Divya Data/i_sliver-design/img_0001.bmp"
         self.test_frame = cv2.imread(self.test_image_path)
 
     # ====================== SAVE USER CONFIG ======================
@@ -544,9 +544,7 @@ class Bridge(QObject):
                             daemon=True
                         ).start()
                         print(f"Saved: {file_path}")
-                        self.emit_defect_payload(status, file_path)
-                        self.stopCamera()
-                        return
+                       
                         # defect_payload = {
                         #     "status": status,
                         #     "defect_type": status,
@@ -570,6 +568,12 @@ class Bridge(QObject):
                             bad_strips,
                             bad_strip_number
                         )
+            print("✅ DEFECT REPORT SAVED")
+            print("saved image path =", file_path)
+            print("db image path =", bad_image_path)
+            self.emit_defect_payload(status, file_path)
+            self.stopCamera()
+            return
 
 
             # =========================

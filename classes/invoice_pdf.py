@@ -204,7 +204,7 @@ class InvoicePDFGenerator:
 
             from path import TEMPLATES_DIR
             temp_html = TEMPLATES_DIR / "dynamic_sliver_invoice.html"
-            temp_html.write_text(html, encoding="utf-8")
+            temp_html.write_text(html, encoding="utf-8")    
             print("Temp HTML:", temp_html)
 
             self.view = QWebEngineView(parent)
