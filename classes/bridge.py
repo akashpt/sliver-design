@@ -55,6 +55,10 @@ class Bridge(QObject):
         self.count_time = QTimer()
         self.count_time.timeout.connect(self.count_show)
         self.count_time.start(1000)
+        self.pdf_mail_timer = QTimer()
+        self.pdf_mail_timer.timeout.connect(self.send_hourly_pdf_mail)
+        self.pdf_mail_timer.start(60 * 60 * 1000)  # 1 hour
+        # self.pdf_mail_timer.start(10000)  # 10 seconds (testing)
         self.inspected = 0
         self.good = 0
         self.bad = 0
@@ -1314,6 +1318,41 @@ class Bridge(QObject):
 
         except Exception as e:
             print("❌ _open_invoice_after_pdf error:", e)
+    
+    def send_hourly_pdf_mail(self):
+        try:
+            from classes.invoice_pdf import InvoicePDFGenerator
+
+            print("🔥 Hourly PDF generation started")
+
+            self.hourly_pdf_generator = InvoicePDFGenerator()
+            self.hourly_pdf_generator.generate_pdf(
+                parent=self.app_ref,
+                finished_callback=self._send_pdf_after_generate
+            )
+
+        except Exception as e:
+            print("❌ send_hourly_pdf_mail error:", e)
+
+
+    def _send_pdf_after_generate(self, ok):
+        try:
+            if not ok:
+                print("❌ Hourly PDF generation failed. Mail not sent.")
+                return
+
+            from classes.send_mail import send_last_generated_pdf
+            import threading
+
+            threading.Thread(
+                target=send_last_generated_pdf,
+                daemon=True
+            ).start()
+
+            print("📧 Fresh generated PDF mail triggered")
+
+        except Exception as e:
+            print("❌ _send_pdf_after_generate error:", e)
                 
     # Navigation
     @pyqtSlot()

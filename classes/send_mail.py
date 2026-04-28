@@ -24,11 +24,11 @@ def send_email_with_attachments(attachments_path,machine_no="",frame_no="",mater
     # ]
     RECIPIENT_EMAILS = [
         "divyadharsinimurugesan@gmail.com",
-        "sniyas8675@gmail.com",
-        "kalaiselvi29778@gmail.com"
+        
+        
     ]
     # from datetime import datetime
-
+# "sniyas8675@gmail.com","kalaiselvi29778@gmail.com"
     # timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
     
@@ -108,3 +108,21 @@ def delete_bad_images(folder_path):
 # ✅ Trigger only if email is sent
 #send_email_with_attachments()
 #delete_bad_images("bad_images")
+def send_last_generated_pdf():
+    from path import INVOICE_PDF
+    from datetime import datetime
+
+    pdf_path = str(INVOICE_PDF)
+
+    if not os.path.exists(pdf_path) or os.path.getsize(pdf_path) == 0:
+        print("❌ Last generated PDF not found or empty:", pdf_path)
+        return False
+
+    return send_email_with_attachments(
+        pdf_path,
+        machine_no="M1",
+        frame_no="-",
+        material="Hourly Invoice Report",
+        color="-",
+        defect_time=datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+    )
