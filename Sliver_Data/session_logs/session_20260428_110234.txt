@@ -1,0 +1,9 @@
+job_id: 
+threshold: 
+lastSaved: 28-04-2026 11:02:34
+start time: 28-04-2026 11:02:27
+end time: 28-04-2026 11:02:34
+inspected: 0
+good: 0
+bad: 0
+ignored frame count: 0

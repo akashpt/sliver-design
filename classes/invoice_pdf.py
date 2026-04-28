@@ -5,8 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from PyQt5.QtCore import QUrl, QEventLoop, QTimer
-from PyQt5.QtWebEngineWidgets import QWebEnginePage
-
+from PyQt5.QtWebEngineWidgets import QWebEngineView
 from path import (
     DB_FILE,
     SLIVER_PDF_PAGE,
@@ -193,75 +192,62 @@ class InvoicePDFGenerator:
 
         return html
 
-    def generate_pdf(self):
+    def generate_pdf(self, parent=None, finished_callback=None):
         try:
             print("🔥 Invoice PDF generation started")
-            # print("HTML Template:", SLIVER_PDF_PAGE)
             print("Output PDF:", INVOICE_PDF)
 
             html = self.build_html()
 
-            # temp_html = Path(INVOICE_PDF).parent / "dynamic_sliver_invoice.html"
-            # temp_html.write_text(html, encoding="utf-8")
-            # print("Temp HTML:", temp_html)
+            pdf_path = Path(INVOICE_PDF)
+            pdf_path.parent.mkdir(parents=True, exist_ok=True)
 
-            page = QWebEnginePage()
-            loop = QEventLoop()
-            result = {"ok": False}
+            from path import TEMPLATES_DIR
+            temp_html = TEMPLATES_DIR / "dynamic_sliver_invoice.html"
+            temp_html.write_text(html, encoding="utf-8")
+            print("Temp HTML:", temp_html)
 
-            def save_pdf(pdf_data):
-                try:
-                    with open(INVOICE_PDF, "wb") as f:
-                        f.write(bytes(pdf_data))
+            self.view = QWebEngineView(parent)
+            self.page = self.view.page()
+            self.finished_callback = finished_callback
 
-                    size = Path(INVOICE_PDF).stat().st_size
-                    print("PDF size:", size)
+            def pdf_finished(file_path, success):
+                print("PDF finished:", file_path, success)
 
-                    result["ok"] = size > 0
-                except Exception as e:
-                    print("❌ save_pdf error:", e)
+                ok = False
+                if success and pdf_path.exists() and pdf_path.stat().st_size > 0:
+                    print("✅ New PDF size:", pdf_path.stat().st_size)
+                    ok = True
+                else:
+                    print("❌ PDF not created correctly")
 
-                if loop.isRunning():
-                    loop.quit()
+                if self.finished_callback:
+                    self.finished_callback(ok)
+
+                self.view.deleteLater()
 
             def html_loaded(ok):
                 print("HTML loaded:", ok)
 
                 if not ok:
-                    loop.quit()
+                    if self.finished_callback:
+                        self.finished_callback(False)
                     return
 
-                print("✅ Calling printToPdf bytes...")
-                QTimer.singleShot(100, lambda: page.printToPdf(save_pdf))
+                with open(pdf_path, "wb") as f:
+                    f.write(b"")
 
-            def timeout():
-                print("⚠️ PDF timeout reached")
+                print("🧹 Old PDF content cleared")
+                print("✅ Calling printToPdf...")
 
-                if Path(INVOICE_PDF).exists() and Path(INVOICE_PDF).stat().st_size > 0:
-                    print("✅ Existing PDF found")
-                    result["ok"] = True
-                    loop.quit()
-                    return
-                else:
-                    print("❌ PDF not created")
+                QTimer.singleShot(1000, lambda: self.page.printToPdf(str(pdf_path)))
 
-                loop.quit()
+            self.page.loadFinished.connect(html_loaded)
+            self.page.pdfPrintingFinished.connect(pdf_finished)
 
-            page.loadFinished.connect(html_loaded)
-            # page.load(QUrl.fromLocalFile(str(temp_html.resolve())))
-            base_url = QUrl.fromLocalFile(str(Path(SLIVER_PDF_PAGE).parent.resolve()) + "/")
-            page.setHtml(html, base_url)
-
-            QTimer.singleShot(8000, timeout)
-            loop.exec_()
-            # try:
-            #     temp_html.unlink(missing_ok=True)
-            #     print("🗑 Temp HTML deleted")
-            # except Exception as e:
-            #     print("⚠️ Temp HTML delete failed:", e)
-
-            return result["ok"]
+            self.view.load(QUrl.fromLocalFile(str(temp_html.resolve())))
 
         except Exception as e:
             print("❌ generate_pdf error:", e)
-            return False
+            if finished_callback:
+                finished_callback(False)

@@ -80,10 +80,9 @@ class Bridge(QObject):
             self.get_system_storage()
 
         # For testing
-        self.test_image_path = r"/home/texa/Aarthy_data/detect_strips/50s_radha_orange/defect_raw/defect_raw_9.bmp"
+        self.test_image_path = r"/home/texa_developer/Divya Data/i_sliver-design/strips.jpeg"
         self.test_frame = cv2.imread(self.test_image_path)
 
-    # ====================== CAMERA ======================
     # ====================== SAVE USER CONFIG ======================
 
     @pyqtSlot(str, str, result=str)
@@ -383,7 +382,6 @@ class Bridge(QObject):
             #     if not ret:
             #         return
 
-<<<<<<< HEAD
             # else:
             #     return
 
@@ -391,27 +389,6 @@ class Bridge(QObject):
             # 🔥 ROTATE FRAME
             # =========================
             # frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
-=======
-
-                # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-            # # =========================
-            # # WEBCAM
-            # # =========================
-            elif self.cap:
-                ret, frame = self.cap.read()
-                if not ret:
-                    return
-
-            else:
-                return
-
-            # # =========================
-            # # 🔥 ROTATE FRAME
-            # # =========================
-            frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
->>>>>>> 8d4b19240bb1b52b1502ae255b942bfb0a2a3760
-
             # =========================defect_path
             # SAVE CURRENT FRAME
             # =========================
@@ -1291,24 +1268,53 @@ class Bridge(QObject):
     # ====================== REPORT SUMMARY End ======================
 
 # invoice viewer slot 
+    # @pyqtSlot()
+    # def openInvoiceViewer(self):
+    #     try:
+    #         from classes.invoice_pdf import InvoicePDFGenerator
+    #         from classes.invoice_viewer import InvoiceViewer
+
+    #         ok = InvoicePDFGenerator().generate_pdf()
+
+    #         if not ok:
+    #             print("❌ Invoice PDF generation failed")
+    #             return
+
+    #         viewer = InvoiceViewer()
+    #         viewer.exec_()
+
+    #     except Exception as e:
+    #         print("❌ openInvoiceViewer error:", e)
     @pyqtSlot()
     def openInvoiceViewer(self):
         try:
             from classes.invoice_pdf import InvoicePDFGenerator
-            from classes.invoice_viewer import InvoiceViewer
 
-            ok = InvoicePDFGenerator().generate_pdf()
+            self.pdf_generator = InvoicePDFGenerator()
 
+            self.pdf_generator.generate_pdf(
+                parent=self.app_ref,
+                finished_callback=self._open_invoice_after_pdf
+            )
+
+        except Exception as e:
+            print("❌ openInvoiceViewer error:", e)
+
+
+    def _open_invoice_after_pdf(self, ok):
+        try:
             if not ok:
                 print("❌ Invoice PDF generation failed")
                 return
+
+            from classes.invoice_viewer import InvoiceViewer
 
             viewer = InvoiceViewer()
             viewer.exec_()
 
         except Exception as e:
-            print("❌ openInvoiceViewer error:", e)
-            
+            print("❌ _open_invoice_after_pdf error:", e)
+                
     # Navigation
     @pyqtSlot()
     def goHome(self):
