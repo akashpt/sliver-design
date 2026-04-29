@@ -35,13 +35,13 @@ def run_path() -> Path:
 APP_DIR = app_path()
 
 
-# STATIC FILES
+# # STATIC FILES
 STATIC_DIR = APP_DIR / "static"
-CSS_DIR = STATIC_DIR / "css"
-JS_DIR = STATIC_DIR / "script"
+# CSS_DIR = STATIC_DIR / "css"
+# JS_DIR = STATIC_DIR / "script"
 IMG_DIR = STATIC_DIR / "img"
-FONTS_DIR = STATIC_DIR / "fonts"
-WEBFONTS_DIR = STATIC_DIR / "webfonts"
+# FONTS_DIR = STATIC_DIR / "fonts"
+# WEBFONTS_DIR = STATIC_DIR / "webfonts"
 
 # TEMPLATES
 TEMPLATES_DIR = APP_DIR / "templates"
@@ -54,7 +54,7 @@ REPORT_NEW = TEMPLATES_DIR / "report_new.html"
 SLIVER_PDF_PAGE = TEMPLATES_DIR / "sliver_invoice.html"
 EMAIL_PAGE = TEMPLATES_DIR / "email.html"
 # CONFIG (READ-ONLY SDK FILES)
-CONFIG_DIR = APP_DIR / "camera_sdk"
+# CONFIG_DIR = APP_DIR / "camera_sdk"
 
 
 # =====================================================
@@ -73,8 +73,8 @@ TRAINING_IMAGES_DIR = DATA_DIR / "training_images"
 PREDICTION_IMAGES_DIR = DATA_DIR / "prediction_images"
 
 
-#USER CONFIG
-USER_CONFIG_FILE = RUN_DIR / "settings.json"
+# #USER CONFIG
+# USER_CONFIG_FILE = RUN_DIR / "settings.json"
 #STORAGE
 STORAGE_FILE = RUN_DIR / "storage.json"
 #INVOICE
@@ -83,19 +83,19 @@ INVOICE_PDF = RUN_DIR / "belt-invoice.pdf"
 # DATABASE
 DB_FILE = RUN_DIR / "sliver.db"
 
-# MODELS
+# # MODELS
 MODELS_DIR = RUN_DIR / "models"
-DEFAULT_MODEL = MODELS_DIR / "best.pt"
+# DEFAULT_MODEL = MODELS_DIR / "best.pt"
 
 # SETTINGS FILES
 SETTINGS_FILE = RUN_DIR / "settings.json"
 TRAINING_SETTINGS_FILE = RUN_DIR / "training_settings.json"
-CONTROLLER_SETTINGS_FILE = RUN_DIR / "controller_setting.json"
+# CONTROLLER_SETTINGS_FILE = RUN_DIR / "controller_setting.json"
 
 
-# SIGNAL FILES
-SIGNAL_FILE = RUN_DIR / "signal.txt"
-COUNT_FILE = RUN_DIR / "count.txt"
+# # SIGNAL FILES
+# SIGNAL_FILE = RUN_DIR / "signal.txt"
+# COUNT_FILE = RUN_DIR / "count.txt"
 
 SESSION_LOG_DIR = RUN_DIR / "session_logs"
 SESSION_LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -113,14 +113,14 @@ MODELS_DIR.mkdir(parents=True, exist_ok=True)
 # DEFAULT FILES (SAFE INIT)
 # =====================================================
 
-if not SIGNAL_FILE.exists():
-    SIGNAL_FILE.write_text("", encoding="utf-8")
+# if not SIGNAL_FILE.exists():
+#     SIGNAL_FILE.write_text("", encoding="utf-8")
 
-if not COUNT_FILE.exists():
-    COUNT_FILE.write_text("0", encoding="utf-8")
+# if not COUNT_FILE.exists():
+#     COUNT_FILE.write_text("0", encoding="utf-8")
 
-if not USER_CONFIG_FILE.exists():
-    USER_CONFIG_FILE.write_text("{}", encoding="utf-8")
+if not SETTINGS_FILE.exists():
+    SETTINGS_FILE.write_text("{}", encoding="utf-8")
 
 if not STORAGE_FILE.exists():
     STORAGE_FILE.write_text("{}", encoding="utf-8")
