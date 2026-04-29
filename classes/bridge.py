@@ -353,15 +353,7 @@ class Bridge(QObject):
         try:
             frame = None
 
-            # For testing
-            if self.test_image_path:
-                frame = cv2.imread(self.test_image_path)
-                frame = self.test_frame.copy()
-
-                if frame is None:
-                    print("Test image not found")
-                    return
-
+            # frame = cv2.imread(r"/home/texa_developer/Divya Data/i_sliver-design/strips.bmp")
 
             # # =========================
             # # MINDVISION CAMERA
