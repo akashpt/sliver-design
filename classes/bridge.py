@@ -56,7 +56,7 @@ class Bridge(QObject):
         self.pdf_mail_timer = QTimer()
         self.pdf_mail_timer.timeout.connect(self.send_hourly_pdf_mail)
         # self.pdf_mail_timer.start(60 * 60 * 1000)  # 1 hour
-        self.pdf_mail_timer.start(10000)  # 10 seconds (testing)
+        self.pdf_mail_timer.start(60 * 60 * 1000)  # 10 seconds (testing)
         self.inspected = 0
         self.good = 0
         self.bad = 0
@@ -220,9 +220,9 @@ class Bridge(QObject):
             return "Camera Already Running"
 
         print("🔥 Starting camera...")
-        # turn_on_whitelight()
-        turn_off_redlight()
-        turn_on_greenlight()
+        turn_on_whitelight()
+        # turn_off_redlight()
+        # turn_on_greenlight()
         print("🟢 Green light ON, 🔴 Red light OFF - camera started")
 
         job_id, _ = self.get_job_from_config()
@@ -293,9 +293,9 @@ class Bridge(QObject):
         self.camera_open = False
         print("✅ Camera fully stopped")
         # all lights off when camera stops
-        turn_off_greenlight()
+        # turn_off_greenlight()
         # turn_off_redlight()
-        # turn_off_whitelight()
+        turn_off_whitelight()
         # self.insert_report()
 
         self.session_end_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
