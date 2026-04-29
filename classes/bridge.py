@@ -5,7 +5,7 @@ import os
 import sqlite3
 import random
 import shutil
-from datetime import datetime
+from datetime import datetime, timedelta
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QTimer, QStandardPaths, QDir
 from PyQt5.QtWidgets import QApplication  # Only if needed elsewhere
 from classes.mindvision import MindVisionCamera
@@ -57,8 +57,9 @@ class Bridge(QObject):
         self.count_time.start(1000)
         self.pdf_mail_timer = QTimer()
         self.pdf_mail_timer.timeout.connect(self.send_hourly_pdf_mail)
-        # self.pdf_mail_timer.start(60 * 60 * 1000)  # 1 hour
-        self.pdf_mail_timer.start(10000)  # 10 seconds (testing)
+        self.pdf_mail_timer.start(60 * 60 * 1000)  # 1 hour
+        # self.pdf_mail_timer.start(60 * 1000)  # 1 minute testing
+        # self.pdf_mail_timer.start(10000)  # 10 seconds (testing)
         self.inspected = 0
         self.good = 0
         self.bad = 0
@@ -355,41 +356,41 @@ class Bridge(QObject):
         try:
             frame = None
 
-            # # For testing
-            # if self.test_image_path:
-            #     frame = cv2.imread(self.test_image_path)
-            #     frame = self.test_frame.copy()
+            # For testing
+            if self.test_image_path:
+                frame = cv2.imread(self.test_image_path)
+                frame = self.test_frame.copy()
 
-            #     if frame is None:
-            #         print("Test image not found")
-            #         return
+                if frame is None:
+                    print("Test image not found")
+                    return
 
 
             # # =========================
             # # MINDVISION CAMERA
             # # =========================
-            if self.use_mindvision and self.camera:
-                frame = self.camera.get_frame()
+            # if self.use_mindvision and self.camera:
+            #     frame = self.camera.get_frame()
 
-                if frame is None:
-                    print("⚠️ MindVision lost → switching to webcam")
-                    self.use_mindvision = False
-                    self.cap = cv2.VideoCapture(0)
-                    return
+            #     if frame is None:
+            #         print("⚠️ MindVision lost → switching to webcam")
+            #         self.use_mindvision = False
+            #         self.cap = cv2.VideoCapture(0)
+            #         return
 
 
-                # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            #     # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
             # # =========================
             # # WEBCAM
             # # =========================
-            elif self.cap:
-                ret, frame = self.cap.read()
-                if not ret:
-                    return
+            # elif self.cap:
+            #     ret, frame = self.cap.read()
+            #     if not ret:
+            #         return
 
-            else:
-                return
+            # else:
+            #     return
 
             # =========================
             # 🔥 ROTATE FRAME
@@ -1338,12 +1339,25 @@ class Bridge(QObject):
             from classes.invoice_pdf import InvoicePDFGenerator
 
             print("🔥 Hourly PDF generation started")
+            end_time = datetime.now()
+            start_time = end_time - timedelta(hours=1)
+
+            start_time_str = start_time.strftime("%Y-%m-%d %H:%M:%S")
+            end_time_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
+
+            print("⏰ Hourly PDF range:", start_time_str, "to", end_time_str)
 
             self.hourly_pdf_generator = InvoicePDFGenerator()
             self.hourly_pdf_generator.generate_pdf(
                 parent=self.app_ref,
-                finished_callback=self._send_pdf_after_generate
+                finished_callback=self._send_pdf_after_generate,
+                start_time=start_time_str,
+                end_time=end_time_str
             )
+            # self.hourly_pdf_generator.generate_pdf(
+            #     parent=self.app_ref,
+            #     finished_callback=self._send_pdf_after_generate
+            # )
 
         except Exception as e:
             print("❌ send_hourly_pdf_mail error:", e)
@@ -1363,7 +1377,7 @@ class Bridge(QObject):
                 daemon=True
             ).start()
 
-            print("📧 Fresh generated PDF mail triggered")
+            print("📧 Generated PDF mail triggered")
 
         except Exception as e:
             print("❌ _send_pdf_after_generate error:", e)
