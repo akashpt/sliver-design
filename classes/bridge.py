@@ -221,9 +221,9 @@ class Bridge(QObject):
             return "Camera Already Running"
 
         print("🔥 Starting camera...")
-        # turn_on_whitelight()
-        turn_off_redlight()
-        turn_on_greenlight()
+        turn_on_whitelight()
+        # turn_off_redlight()
+        # turn_on_greenlight()
         print("🟢 Green light ON, 🔴 Red light OFF - camera started")
 
         job_id, _ = self.get_job_from_config()
@@ -294,9 +294,9 @@ class Bridge(QObject):
         self.camera_open = False
         print("✅ Camera fully stopped")
         # all lights off when camera stops
-        turn_off_greenlight()
+        # turn_off_greenlight()
         # turn_off_redlight()
-        # turn_off_whitelight()
+        turn_off_whitelight()
         # self.insert_report()
 
         self.session_end_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
@@ -353,7 +353,6 @@ class Bridge(QObject):
         try:
             frame = None
 
-<<<<<<< HEAD
             # For testing
             if self.test_image_path:
                 frame = cv2.imread(self.test_image_path)
@@ -363,9 +362,6 @@ class Bridge(QObject):
                     print("Test image not found")
                     return
 
-=======
-            # frame = cv2.imread(r"/home/texa_developer/Divya Data/i_sliver-design/strips.bmp")
->>>>>>> 7493dd9ebfa5ce9f453576afc1708cbeab26d47a
 
             # # =========================
             # # MINDVISION CAMERA

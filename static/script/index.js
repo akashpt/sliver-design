@@ -965,7 +965,7 @@ function restartFromModal() {
   isRunning = false;
 
   // Restart detection immediately
-  startDetection();
+  // startDetection();
 }
 
 // function downloadDefectImage() {
