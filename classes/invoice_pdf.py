@@ -219,6 +219,16 @@ class InvoicePDFGenerator:
             print("Output PDF:", INVOICE_PDF)
 
             # html = self.build_html()
+            summary, defects = self._fetch_report_data(start_time, end_time)
+
+            inspected = summary[0] if summary and summary[0] is not None else 0
+
+            if inspected == 0:
+                print("⚠️ No report data in this hourly range. PDF/mail skipped.")
+                if finished_callback:
+                    finished_callback(False)
+                return
+
             html = self.build_html(start_time, end_time)
 
             pdf_path = Path(INVOICE_PDF)
