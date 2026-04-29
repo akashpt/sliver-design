@@ -271,6 +271,7 @@ class Bridge(QObject):
     def turn_off_warning(self):
         try:
             turn_off_redlight()
+            turn_off_bluelight()
         except Exception as e:
             print("Turn off the warning :", e)
 
@@ -301,7 +302,7 @@ class Bridge(QObject):
         self.camera_open = False
         print("✅ Camera fully stopped")
         # all lights off when camera stops
-        # turn_off_greenlight()
+        turn_off_greenlight()
         # turn_off_redlight()
         turn_off_whitelight()
         # self.insert_report()
@@ -391,7 +392,7 @@ class Bridge(QObject):
             # =========================
             frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
-            frame = cv2.imread(r"D:\Texa\sliver\sliver-design\Sliver_Data\WhatsApp Image 2026-04-29 at 2.33.25 PM.jpeg")
+            # frame = cv2.imread(r"D:\Texa\sliver\sliver-design\Sliver_Data\WhatsApp Image 2026-04-29 at 2.33.25 PM.jpeg")
 
             # =========================defect_path
             # SAVE CURRENT FRAME
@@ -432,13 +433,14 @@ class Bridge(QObject):
             if status == "good":
                 turn_on_greenlight()
                 turn_off_redlight()
+                turn_off_bluelight()
                 print("🟢 GOOD: Green light ON, Red light OFF")
 
             if status == "strip missing":
                 bad_strips = bad_count
                 bad_strip_number = "missing"
                 turn_off_greenlight()
-                turn_on_redlight()
+                turn_on_bluelight()
                 print("⚠️ STRIP MISSING: Green light OFF, Red light ON")
                 
             elif status == "defect":
