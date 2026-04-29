@@ -75,7 +75,7 @@ document.addEventListener("DOMContentLoaded", function () {
           // Show Restart button (not Close) for live defect alert
           const alertBtn = document.getElementById("modalRestartBtn");
           if (alertBtn) {
-            alertBtn.innerHTML = '<i class="fas fa-rotate-right"></i> Restart';
+            alertBtn.innerHTML = '<i class="fas fa-rotate-right"></i> Reset';
             alertBtn.onclick = restartFromModal;
           }
 
@@ -964,7 +964,15 @@ function restartFromModal() {
 
   // Reset running flag so startDetection() can proceed
   isRunning = false;
-  enableSideMenu()
+  enableSideMenu();
+
+  if (bridge && typeof bridge.turn_off_warning === "function") {
+    try {
+      bridge.turn_off_warning();
+    } catch (e) {
+      console.error("Error stopping camera via bridge:", e);
+    }
+  }
   // Restart detection immediately
   // startDetection();
 }

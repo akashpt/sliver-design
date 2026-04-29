@@ -266,6 +266,13 @@ class Bridge(QObject):
             self.timer.start(self.pr_time * 1000)
 
         return "OK"
+    
+    @pyqtSlot()
+    def turn_off_warning(self):
+        try:
+            turn_off_redlight()
+        except Exception as e:
+            print("Turn off the warning :", e)
 
     @pyqtSlot()
     def stopCamera(self):
@@ -643,9 +650,9 @@ class Bridge(QObject):
     
     def emit_defect_payload(self, status, file_path):
         try:
-            turn_off_greenlight()
-            turn_on_redlight()
-            print("🔴 Defect popup showing: Green OFF, Red ON")
+            # turn_off_greenlight()
+            # turn_on_redlight()
+            # print("🔴 Defect popup showing: Green OFF, Red ON")
 
             defect_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
