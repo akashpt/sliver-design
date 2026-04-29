@@ -353,38 +353,39 @@ class Bridge(QObject):
         try:
             frame = None
 
-            # frame = cv2.imread(r"/home/texa_developer/Divya Data/i_sliver-design/strips.bmp")
+            # =========================
+            # MINDVISION CAMERA
+            # =========================
+            if self.use_mindvision and self.camera:
+                frame = self.camera.get_frame()
 
-            # # =========================
-            # # MINDVISION CAMERA
-            # # =========================
-            # if self.use_mindvision and self.camera:
-            #     frame = self.camera.get_frame()
-
-            #     if frame is None:
-            #         print("⚠️ MindVision lost → switching to webcam")
-            #         self.use_mindvision = False
-            #         self.cap = cv2.VideoCapture(0)
-            #         return
+                if frame is None:
+                    print("⚠️ MindVision lost → switching to webcam")
+                    self.use_mindvision = False
+                    self.cap = cv2.VideoCapture(0)
+                    return
 
 
-            #     # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            # # =========================
-            # # WEBCAM
-            # # =========================
-            # elif self.cap:
-            #     ret, frame = self.cap.read()
-            #     if not ret:
-            #         return
+            # =========================
+            # WEBCAM
+            # =========================
+            elif self.cap:
+                ret, frame = self.cap.read()
+                if not ret:
+                    return
 
-            # else:
-            #     return
-
+            else:
+                return
+            
             # =========================
             # 🔥 ROTATE FRAME
             # =========================
             frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
+            frame = cv2.imread(r"D:\Texa\sliver\sliver-design\Sliver_Data\WhatsApp Image 2026-04-29 at 2.33.25 PM.jpeg")
+
             # =========================defect_path
             # SAVE CURRENT FRAME
             # =========================

@@ -935,21 +935,22 @@ function changeDefect(direction) {
   updateModalImage();
 }
 
-// function closeDefectModal() {
-//   const modal = document.getElementById("defectModal");
-//   if (modal) modal.style.display = "none";
-// }
 function closeDefectModal() {
   const modal = document.getElementById("defectModal");
   if (modal) modal.style.display = "none";
-
-  document.getElementById("startBtn").disabled = false;
-  document.getElementById("stopBtn").disabled = true;
-  document.getElementById("resetConfigBtn").disabled = false;
-  document.getElementById("statusLabel").textContent = "STANDBY";
-
-  enableSideMenu();
 }
+
+// function closeDefectModal() {
+//   const modal = document.getElementById("defectModal");
+//   if (modal) modal.style.display = "none";
+
+//   document.getElementById("startBtn").disabled = false;
+//   document.getElementById("stopBtn").disabled = true;
+//   document.getElementById("resetConfigBtn").disabled = false;
+//   document.getElementById("statusLabel").textContent = "STANDBY";
+
+//   // enableSideMenu();
+// }
 
 // ─── Restart from Defect Modal ───────────────────────────────────────
 function restartFromModal() {
@@ -963,7 +964,7 @@ function restartFromModal() {
 
   // Reset running flag so startDetection() can proceed
   isRunning = false;
-
+  enableSideMenu()
   // Restart detection immediately
   // startDetection();
 }
@@ -1100,9 +1101,9 @@ function switchTab(tabName) {
 }
 
 // Modal outside click
-document.getElementById("defectModal")?.addEventListener("click", (e) => {
-  if (e.target === e.currentTarget) closeDefectModal();
-});
+// document.getElementById("defectModal")?.addEventListener("click", (e) => {
+//   if (e.target === e.currentTarget) closeDefectModal();
+// });
 document.getElementById("settingsModal")?.addEventListener("click", (e) => {
   if (e.target === e.currentTarget) closeSettings();
 });
