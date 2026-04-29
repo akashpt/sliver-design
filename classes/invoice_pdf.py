@@ -13,7 +13,7 @@ from path import (
     PREDICTION_IMAGES_DIR,
     IMG_DIR,
     TRAINING_SETTINGS_FILE,
-    USER_CONFIG_FILE
+    SETTINGS_FILE
 )
 
 class InvoicePDFGenerator:
@@ -37,7 +37,7 @@ class InvoicePDFGenerator:
         conn = sqlite3.connect(self.db_path)
         cur = conn.cursor()
 
-        config_path = USER_CONFIG_FILE
+        config_path = SETTINGS_FILE
 
         job_id = ""
 
@@ -206,8 +206,8 @@ class InvoicePDFGenerator:
             pdf_path = Path(INVOICE_PDF)
             pdf_path.parent.mkdir(parents=True, exist_ok=True)
 
-            from path import TEMPLATES_DIR
-            temp_html = TEMPLATES_DIR / "dynamic_sliver_invoice.html"
+            # from path import TEMPLATES_DIR
+            temp_html = REPORT_NEW
             temp_html.write_text(html, encoding="utf-8")    
             print("Temp HTML:", temp_html)
 

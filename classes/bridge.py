@@ -9,7 +9,7 @@ from datetime import datetime
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QTimer, QStandardPaths, QDir
 from PyQt5.QtWidgets import QApplication  # Only if needed elsewhere
 from classes.mindvision import MindVisionCamera
-from path import *
+from path import DB_FILE,SETTINGS_FILE, TRAINING_IMAGES_DIR, SESSION_LOG_DIR, PREDICTION_IMAGES_DIR, TRAINING_SETTINGS_FILE, MODELS_DIR, EMAIL_PAGE, STORAGE_FILE, INDEX_PAGE, TRAINING_PAGE
 from classes.training import StripColorTraining
 from classes.prediction import StripColorPrediction
 from classes.modbus_relay_code import *
@@ -28,8 +28,6 @@ class Bridge(QObject):
 
         #database
         self.db_path = str(DB_FILE)   # set DB path
-        # self.init_db()    
-        print("DB Path:", self.db_path)            # create table automatically
 
         # Camera
         self.camera = None  
@@ -44,12 +42,12 @@ class Bridge(QObject):
         self.last_training_save_time = 0
         self.get_system_storage()
 
-        self.test_image_path = None
         self.test_frame = None
 
         # Frame timer
         self.timer = QTimer()
         self.timer.timeout.connect(self.grab_frame)
+        self.pr_time = 1  # seconds
         self.process = None
 
         self.count_time = QTimer()
@@ -67,7 +65,7 @@ class Bridge(QObject):
         # config_dir = QStandardPaths.writableLocation(QStandardPaths.AppConfigLocation)
         # QDir().mkpath(config_dir)
         # self.config_path = os.path.join(config_dir, "userConfig.json")        
-        self.config_path= str(USER_CONFIG_FILE)
+        self.config_path= str(SETTINGS_FILE)
 
         # For observation purpose - ignored frames count
         self.session_start_time = ""
@@ -83,9 +81,6 @@ class Bridge(QObject):
             self.detector.color_threshold = float(self.threshold)
             self.get_system_storage()
 
-        # For testing
-        self.test_image_path = r"/home/texa_developer/Divya Data/i_sliver-design/strips.bmp"
-        self.test_frame = cv2.imread(self.test_image_path)
 
     # ====================== SAVE USER CONFIG ======================
 
@@ -267,7 +262,7 @@ class Bridge(QObject):
             self.timer.start(35)
         else:
             # Continue live updates
-            self.timer.start(1000)
+            self.timer.start(self.pr_time * 1000)
 
         return "OK"
 
@@ -355,15 +350,7 @@ class Bridge(QObject):
         try:
             frame = None
 
-            # # For testing
-            # if self.test_image_path:
-            #     frame = cv2.imread(self.test_image_path)
-            #     frame = self.test_frame.copy()
-
-            #     if frame is None:
-            #         print("Test image not found")
-            #         return
-
+            # frame = cv2.imread(r"/home/texa_developer/Divya Data/i_sliver-design/strips.bmp")
 
             # # =========================
             # # MINDVISION CAMERA
