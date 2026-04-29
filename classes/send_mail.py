@@ -24,6 +24,7 @@ def send_email_with_attachments(attachments_path,machine_no="",frame_no="",mater
     # ]
     RECIPIENT_EMAILS = [
         "divyadharsinimurugesan@gmail.com",
+        "aarthysm05@gmail.com"
         
         
     ]

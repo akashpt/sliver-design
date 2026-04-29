@@ -307,7 +307,9 @@ class Bridge(QObject):
         try:
             job_id, threshold = self.get_job_from_config()
 
-            file_name = datetime.now().strftime("session_%Y%m%d_%H%M%S.txt")
+            today = datetime.now().strftime("%Y%m%d")
+            safe_job_id = job_id.replace(" ", "_")
+            file_name = f"{safe_job_id}_{today}.txt"
             file_path = SESSION_LOG_DIR / file_name   # create path in path.py
 
             with open(file_path, "w", encoding="utf-8") as f:
@@ -381,7 +383,7 @@ class Bridge(QObject):
             # =========================
             # 🔥 ROTATE FRAME
             # =========================
-            # frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
             # =========================defect_path
             # SAVE CURRENT FRAME
             # =========================
