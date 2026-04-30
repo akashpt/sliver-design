@@ -974,7 +974,7 @@ function openDefectModal(index) {
           const parsed = JSON.parse(res);
 
           if (parsed.ok) {
-            alert("Training image appended successfully");
+            // alert("Training image appended successfully");
             closeDefectModal();
           } else {
             alert("Failed: " + parsed.message);
