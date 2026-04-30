@@ -177,7 +177,7 @@ class StripColorTraining:
 
 
 if __name__ == "__main__":
-    trainer = StripColorTraining("/home/texa-developer/data/sliver/models")
+    trainer = StripColorTraining("/home/texa-developer/data/sliver-design/models")
 
     trainer.train(
         folder_path="/home/texa-developer/data/sliver_delta/4s_vsf_white",

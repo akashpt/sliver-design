@@ -225,7 +225,7 @@ class StripColorPrediction:
 
 if __name__ == "__main__":
     predictor = StripColorPrediction(
-        models_dir="/home/texa-developer/data/sliver/models",
+        models_dir="/home/texa-developer/data/sliver-design/models",
         variance_threshold=100.0
     )
 
