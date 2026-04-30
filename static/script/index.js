@@ -73,6 +73,10 @@ document.addEventListener("DOMContentLoaded", function () {
           document.getElementById("prevDefect").style.display = "none";
           document.getElementById("nextDefect").style.display = "none";
 
+          // Hide Cancel during live defect alert (only Reset shown)
+          const cancelBtnLive = document.getElementById("modalCancelBtn");
+          if (cancelBtnLive) cancelBtnLive.style.display = "none";
+
           // Show Restart button (not Close) for live defect alert
           const alertBtn = document.getElementById("modalRestartBtn");
           if (alertBtn) {
@@ -922,86 +926,74 @@ function renderDefectThumbs() {
 
 function openDefectModal(index) {
   currentModalIndex = index;
+
   const modal = document.getElementById("defectModal");
   if (!modal) return;
 
-  // Restore navigation arrows (hidden during live defect alert)
+  // Restore arrows
   document.getElementById("prevDefect").style.display = "";
   document.getElementById("nextDefect").style.display = "";
 
-  // Show Close button (not Restart) when opened from thumbnail slider
+  // Show Cancel button (hidden during live defect alert)
+  const cancelBtn = document.getElementById("modalCancelBtn");
+  if (cancelBtn) {
+    cancelBtn.style.display = "";
+    cancelBtn.onclick = closeDefectModal;
+  }
+
+  // OK button → append training image
   const btn = document.getElementById("modalRestartBtn");
   if (btn) {
-    btn.innerHTML = "Close";
-    btn.onclick = closeDefectModal;
+    btn.innerHTML = "OK";
+
+    btn.onclick = function () {
+      try {
+        const defect = defectHistory[currentModalIndex];
+
+        console.log("[AppendTraining] currentModalIndex =", currentModalIndex);
+        console.log("[AppendTraining] defect =", defect);
+
+        if (!defect) {
+          alert("No defect selected");
+          return;
+        }
+
+        if (!defect.raw_path) {
+          alert("Raw image path is missing for this defect");
+          return;
+        }
+
+        // Strip file:/// prefix before sending to Python (os.path.exists needs a plain path)
+        let imgPath = defect.raw_path.replace(/^file:\/{2,3}/, "");
+
+        console.log("[AppendTraining] sending path →", imgPath);
+
+        bridge.appendTraining(imgPath).then((res) => {
+          console.log("[AppendTraining] result =", res);
+
+          const parsed = JSON.parse(res);
+
+          if (parsed.ok) {
+            alert("Training image appended successfully");
+            closeDefectModal();
+          } else {
+            alert("Failed: " + parsed.message);
+          }
+        }).catch((err) => {
+          console.error("[AppendTraining] bridge error:", err);
+          alert("Bridge call failed: " + err);
+        });
+
+      } catch (err) {
+        console.error("[AppendTraining] error:", err);
+        alert("Unexpected error: " + err.message);
+      }
+    };
   }
 
   updateModalImage();
   modal.style.display = "flex";
 }
-
-// function openDefectModal(index) {
-//   currentModalIndex = index;
-
-//   const modal = document.getElementById("defectModal");
-//   if (!modal) return;
-
-//   // Restore arrows
-//   document.getElementById("prevDefect").style.display = "";
-//   document.getElementById("nextDefect").style.display = "";
-
-//   const btn = document.getElementById("modalRestartBtn");
-
-//   if (btn) {
-//     btn.innerHTML = "Close";
-
-//     btn.onclick = function () {
-//       try {
-//         const defect = defectHistory[currentModalIndex];
-
-//         console.log("[AppendTraining] currentModalIndex =", currentModalIndex);
-//         console.log("[AppendTraining] defect =", defect);
-
-//         if (!defect) {
-//           alert("No defect selected");
-//           return;
-//         }
-
-//         if (!defect.raw_path) {
-//           alert("Raw image path is missing for this defect");
-//           return;
-//         }
-
-//         // Strip file:/// prefix before sending to Python (os.path.exists needs a plain path)
-//         let imgPath = defect.raw_path.replace(/^file:\/{2,3}/, "");
-
-//         console.log("[AppendTraining] sending path →", imgPath);
-
-//         bridge.appendTraining(imgPath).then((res) => {
-//           console.log("[AppendTraining] result =", res);
-
-//           const parsed = JSON.parse(res);
-
-//           if (parsed.ok) {
-//             alert("Training image appended successfully");
-//             closeDefectModal();
-//           } else {
-//             alert("Failed: " + parsed.message);
-//           }
-//         }).catch((err) => {
-//           console.error("[AppendTraining] bridge error:", err);
-//           alert("Bridge call failed: " + err);
-//         });
-
-//       } catch (err) {
-//         console.error("[AppendTraining] error:", err);
-//         alert("Unexpected error: " + err.message);
-//       }
-//     };
-//   }
-//   updateModalImage();
-//   modal.style.display = "flex";
-// }
 
 
 function updateModalImage() {
