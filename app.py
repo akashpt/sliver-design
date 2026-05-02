@@ -107,8 +107,8 @@ class MainWindow(QMainWindow):
         self.bridge.stopCamera()  # Ask bridge to cleanup camera
         super().closeEvent(event)
         try:
-            from classes.modbus_relay_code import turn_off_greenlight
-            turn_off_greenlight()
+            from classes.modbus_relay_code import turn_off_all_relays
+            turn_off_all_relays()
             print("🟢 Green light OFF (app closed)")
         except Exception as e:
             print("❌ Modbus close error:", e)

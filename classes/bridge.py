@@ -206,7 +206,69 @@ class Bridge(QObject):
         except Exception as e:
             print(f"❌ save_training_image error: {e}")
             return ""
-        
+
+    @pyqtSlot(str, result=str)
+    def appendTraining(self, image_path):
+        try:
+            job_id, _ = self.get_job_from_config()
+
+            if not job_id:
+                return json.dumps({
+                    "ok": False,
+                    "message": "No job id selected"
+                })
+
+            if not image_path or not os.path.exists(image_path):
+                return json.dumps({
+                    "ok": False,
+                    "message": "Selected image not found"
+                })
+
+            img = cv2.imread(image_path)
+
+            if img is None:
+                return json.dumps({
+                    "ok": False,
+                    "message": "Cannot read selected image"
+                })
+
+            # Save into training folder
+            saved_path = self.save_training_image(img, job_id)
+
+            if not saved_path:
+                return json.dumps({
+                    "ok": False,
+                    "message": "Failed to append image"
+                })
+
+            print("✅  ed image:", saved_path)
+
+            # Retrain
+            training_folder = self.get_training_job_folder(job_id)
+
+            trainer = StripColorTraining()
+            result = trainer.train(str(training_folder), job_id)
+
+            if result.get("ok"):
+                return json.dumps({
+                    "ok": True,
+                    "message": "Append completed",
+                    "job_id": job_id,
+                    "image_path": saved_path
+                })
+
+            return json.dumps({
+                "ok": False,
+                "message": result.get("message", "Training failed")
+            })
+
+        except Exception as e:
+            print("❌ appendTraining error:", e)
+
+            return json.dumps({
+                "ok": False,
+                "message": str(e)
+            })
    
     @pyqtSlot(str,result=str)
     def startCamera(self,process):
@@ -266,6 +328,14 @@ class Bridge(QObject):
             self.timer.start(self.pr_time * 1000)
 
         return "OK"
+    
+    @pyqtSlot()
+    def turn_off_warning(self):
+        try:
+            turn_off_redlight()
+            turn_off_bluelight()
+        except Exception as e:
+            print("Turn off the warning :", e)
 
     @pyqtSlot()
     def stopCamera(self):
@@ -294,7 +364,7 @@ class Bridge(QObject):
         self.camera_open = False
         print("✅ Camera fully stopped")
         # all lights off when camera stops
-        # turn_off_greenlight()
+        turn_off_greenlight()
         # turn_off_redlight()
         turn_off_whitelight()
         # self.insert_report()
@@ -385,6 +455,7 @@ class Bridge(QObject):
             # frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
             frame = cv2.imread(r"/home/texa_developer/Divya Data/i_sliver-design/img_0001.bmp")
+            # frame = cv2.imread(r"D:\Texa\sliver\sliver-design\Sliver_Data\WhatsApp Image 2026-04-29 at 2.33.25 PM.jpeg")
 
             # =========================defect_path
             # SAVE CURRENT FRAME
@@ -425,13 +496,14 @@ class Bridge(QObject):
             if status == "good":
                 turn_on_greenlight()
                 turn_off_redlight()
+                turn_off_bluelight()
                 print("🟢 GOOD: Green light ON, Red light OFF")
 
             if status == "strip missing":
                 bad_strips = bad_count
                 bad_strip_number = "missing"
                 turn_off_greenlight()
-                turn_on_redlight()
+                turn_on_bluelight()
                 print("⚠️ STRIP MISSING: Green light OFF, Red light ON")
                 
             elif status == "defect":
@@ -470,7 +542,7 @@ class Bridge(QObject):
                     file_path = defect_folder / f"defect_{timestamp}.jpg"
 
                     # raw image path
-                    raw_path = raw_folder / f"raw_{timestamp}.jpg"
+                    raw_path = raw_folder / f"raw_{timestamp}.bmp"
 
 
                     # filename = f"defect_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.jpg"
@@ -564,7 +636,7 @@ class Bridge(QObject):
                         print("✅ DEFECT REPORT SAVED")
                         print("saved image path =", file_path)
                         print("db image path =", bad_image_path)
-                        self.emit_defect_payload(status, file_path)
+                        self.emit_defect_payload(status, file_path, raw_path)
                         self.stopCamera()
                         return
 
@@ -641,18 +713,19 @@ class Bridge(QObject):
 
         return status,processed_img, raw_img, bad_count, bad_indices
     
-    def emit_defect_payload(self, status, file_path):
+    def emit_defect_payload(self, status, file_path, raw_path):
         try:
-            turn_off_greenlight()
-            turn_on_redlight()
-            print("🔴 Defect popup showing: Green OFF, Red ON")
+            # turn_off_greenlight()
+            # turn_on_redlight()
+            # print("🔴 Defect popup showing: Green OFF, Red ON")
 
             defect_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
             payload = {
                 "status": status,
                 "defect_type": status,
-                "image_path": str(file_path),
+                "image_path": str(file_path),   # popup preview
+                "raw_path": str(raw_path),      # append source
                 "time": defect_time
             }
 
@@ -864,9 +937,22 @@ class Bridge(QObject):
             images = []
 
             for row in rows:
-                path = row[0]
-                full_path = str(PREDICTION_IMAGES_DIR / path)  
-                images.append(full_path)
+                rel_path = row[0]  # e.g. job_id/defect/defect_TIMESTAMP.jpg
+
+                # Full path to the processed (display) image
+                full_defect_path = str(PREDICTION_IMAGES_DIR / rel_path)
+
+                # Derive raw path: job_id/defect_raw/raw_TIMESTAMP.bmp
+                # rel_path format: job_id/defect/defect_TIMESTAMP.jpg
+                import re
+                raw_rel = re.sub(r'/defect/', '/defect_raw/', rel_path)
+                raw_rel = re.sub(r'/defect_([^/]+)\.jpg$', r'/raw_\1.bmp', raw_rel)
+                full_raw_path = str(PREDICTION_IMAGES_DIR / raw_rel)
+
+                images.append({
+                    "src": full_defect_path,
+                    "raw_path": full_raw_path
+                })
 
             return json.dumps({"images": images})
         

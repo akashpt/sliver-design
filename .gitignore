@@ -34,3 +34,4 @@ __pycache__/
 
 count.txt
 signal.txt*.bmp
+Sliver_Data/sliver.db

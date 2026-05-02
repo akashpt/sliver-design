@@ -137,13 +137,13 @@ def turn_off_greenlight():
         return False
 
 
-def turn_on_yellowlight(): 
+def turn_on_bluelight(): 
     try:
         client.write_coil(4, True, unit=SLAVE_ID)
     except Exception as e:
         return False
 
-def turn_off_yellowlight(): 
+def turn_off_bluelight(): 
     try:
         client.write_coil(4, False, unit=SLAVE_ID)
     except Exception as e:
@@ -189,7 +189,12 @@ def turn_off_empty():
         return False
 
 
-
+def turn_off_all_relays():
+    try:
+        for i in range(8):
+            client.write_coil(i, False, unit=SLAVE_ID)
+    except Exception as e:
+        return False
 
 
 # turn_on_whitelight()
@@ -230,8 +235,6 @@ def turn_off_empty():
 # channel 4  -- yellow light
 # channel 5  -- green light
 
-
-
-turn_off_redlight()
+# turn_off_redlight()
 
 

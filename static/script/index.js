@@ -61,6 +61,7 @@ document.addEventListener("DOMContentLoaded", function () {
           defectHistory.unshift({
             time: defect.defect_type || "DEFECT",
             src: imgSrc,
+            raw_path: defect.raw_path
           });
 
           renderDefectThumbs();
@@ -72,10 +73,14 @@ document.addEventListener("DOMContentLoaded", function () {
           document.getElementById("prevDefect").style.display = "none";
           document.getElementById("nextDefect").style.display = "none";
 
+          // Hide Cancel during live defect alert (only Reset shown)
+          const cancelBtnLive = document.getElementById("modalCancelBtn");
+          if (cancelBtnLive) cancelBtnLive.style.display = "none";
+
           // Show Restart button (not Close) for live defect alert
           const alertBtn = document.getElementById("modalRestartBtn");
           if (alertBtn) {
-            alertBtn.innerHTML = '<i class="fas fa-rotate-right"></i> Restart';
+            alertBtn.innerHTML = '<i class="fas fa-rotate-right"></i> Reset';
             alertBtn.onclick = restartFromModal;
           }
 
@@ -328,22 +333,46 @@ async function loadDefectImagesFromBridge() {
 
     defectHistory = [];
 
-    images.forEach((src) => {
-      if (!src) return;
+    images.forEach((item) => {
+      if (!item) return;
 
-      let imgSrc = src;
+      // Bridge now returns objects: { src, raw_path }
+      // Fallback: support plain string paths from older bridge versions
+      const srcRaw = typeof item === "object" ? item.src : item;
+      const rawRaw = typeof item === "object" ? item.raw_path : null;
 
-      // Normalize Windows path → file URL
-      imgSrc = imgSrc.replace(/\\/g, "/");
+      if (!srcRaw) return;
 
+      // Normalize display path to file:/// URL
+      let imgSrc = srcRaw.replace(/\\/g, "/");
       if (!imgSrc.startsWith("file:///")) {
         imgSrc = "file:///" + imgSrc;
       }
 
-      defectHistory.push({
-        time: "",
-        src: imgSrc,
-      });
+      // Normalize raw path to file:/// URL
+      let raw_path = "";
+      if (rawRaw) {
+        // Python already computed the correct raw path - use it directly
+        raw_path = rawRaw.replace(/\\/g, "/");
+        if (!raw_path.startsWith("file:///")) {
+          raw_path = "file:///" + raw_path;
+        }
+      } else {
+        // Fallback: derive raw_path from the original src string (before file:/// prefix)
+        // to avoid double-replacing the folder name
+        const normalized = srcRaw.replace(/\\/g, "/");
+        raw_path =
+          "file:///" +
+          normalized
+            .replace("/defect/", "/defect_raw/")
+            .replace(/\/defect_([^/]+\.jpg)$/i, "/raw_$1")
+            .replace(/\.jpg$/i, ".bmp");
+      }
+
+      console.log("[DefectLoad] src →", imgSrc);
+      console.log("[DefectLoad] raw →", raw_path);
+
+      defectHistory.push({ time: "", src: imgSrc, raw_path });
     });
 
     console.log("✅ Defect images loaded:", defectHistory.length);
@@ -897,23 +926,75 @@ function renderDefectThumbs() {
 
 function openDefectModal(index) {
   currentModalIndex = index;
+
   const modal = document.getElementById("defectModal");
   if (!modal) return;
 
-  // Restore navigation arrows (hidden during live defect alert)
+  // Restore arrows
   document.getElementById("prevDefect").style.display = "";
   document.getElementById("nextDefect").style.display = "";
 
-  // Show Close button (not Restart) when opened from thumbnail slider
+  // Show Cancel button (hidden during live defect alert)
+  const cancelBtn = document.getElementById("modalCancelBtn");
+  if (cancelBtn) {
+    cancelBtn.style.display = "";
+    cancelBtn.onclick = closeDefectModal;
+  }
+
+  // OK button → append training image
   const btn = document.getElementById("modalRestartBtn");
   if (btn) {
-    btn.innerHTML = "Close";
-    btn.onclick = closeDefectModal;
+    btn.innerHTML = "OK";
+
+    btn.onclick = function () {
+      try {
+        const defect = defectHistory[currentModalIndex];
+
+        console.log("[AppendTraining] currentModalIndex =", currentModalIndex);
+        console.log("[AppendTraining] defect =", defect);
+
+        if (!defect) {
+          alert("No defect selected");
+          return;
+        }
+
+        if (!defect.raw_path) {
+          alert("Raw image path is missing for this defect");
+          return;
+        }
+
+        // Strip file:/// prefix before sending to Python (os.path.exists needs a plain path)
+        let imgPath = defect.raw_path.replace(/^file:\/{2,3}/, "");
+
+        console.log("[AppendTraining] sending path →", imgPath);
+
+        bridge.appendTraining(imgPath).then((res) => {
+          console.log("[AppendTraining] result =", res);
+
+          const parsed = JSON.parse(res);
+
+          if (parsed.ok) {
+            // alert("Training image appended successfully");
+            closeDefectModal();
+          } else {
+            alert("Failed: " + parsed.message);
+          }
+        }).catch((err) => {
+          console.error("[AppendTraining] bridge error:", err);
+          alert("Bridge call failed: " + err);
+        });
+
+      } catch (err) {
+        console.error("[AppendTraining] error:", err);
+        alert("Unexpected error: " + err.message);
+      }
+    };
   }
 
   updateModalImage();
   modal.style.display = "flex";
 }
+
 
 function updateModalImage() {
   if (currentModalIndex < 0 || currentModalIndex >= defectHistory.length)
@@ -964,7 +1045,15 @@ function restartFromModal() {
 
   // Reset running flag so startDetection() can proceed
   isRunning = false;
-  enableSideMenu()
+  enableSideMenu();
+
+  if (bridge && typeof bridge.turn_off_warning === "function") {
+    try {
+      bridge.turn_off_warning();
+    } catch (e) {
+      console.error("Error stopping camera via bridge:", e);
+    }
+  }
   // Restart detection immediately
   // startDetection();
 }
