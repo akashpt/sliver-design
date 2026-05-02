@@ -79,6 +79,9 @@ PREDICTION_IMAGES_DIR = DATA_DIR / "prediction_images"
 STORAGE_FILE = RUN_DIR / "storage.json"
 #INVOICE
 INVOICE_PDF = RUN_DIR / "belt-invoice.pdf"
+# PDF REPORT BACKUP FOLDERS
+PDF_REPORTS_DIR = RUN_DIR / "pdf_reports"
+HOURWISE_PDF_REPORTS_DIR = PDF_REPORTS_DIR / "hourwise"
 
 # DATABASE
 DB_FILE = RUN_DIR / "sliver.db"
@@ -108,6 +111,8 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 TRAINING_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 PREDICTION_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
+PDF_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+HOURWISE_PDF_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # =====================================================
 # DEFAULT FILES (SAFE INIT)

@@ -55,8 +55,8 @@ class Bridge(QObject):
         self.count_time.start(1000)
         self.pdf_mail_timer = QTimer()
         self.pdf_mail_timer.timeout.connect(self.send_hourly_pdf_mail)
-        self.pdf_mail_timer.start(60 * 60 * 1000)  # 1 hour
-        # self.pdf_mail_timer.start(60 * 1000)  # 1 minute testing
+        # self.pdf_mail_timer.start(60 * 60 * 1000)  # 1 hour
+        self.pdf_mail_timer.start(60 * 1000)  # 1 minute testing
         # self.pdf_mail_timer.start(10000)  # 10 seconds (testing)
         self.inspected = 0
         self.good = 0
@@ -351,40 +351,40 @@ class Bridge(QObject):
 
     def grab_frame(self):
         try:
-            frame = None
+            # frame = None
 
-            # =========================
-            # MINDVISION CAMERA
-            # =========================
-            if self.use_mindvision and self.camera:
-                frame = self.camera.get_frame()
+            # # =========================
+            # # MINDVISION CAMERA
+            # # =========================
+            # if self.use_mindvision and self.camera:
+            #     frame = self.camera.get_frame()
 
-                if frame is None:
-                    print("⚠️ MindVision lost → switching to webcam")
-                    self.use_mindvision = False
-                    self.cap = cv2.VideoCapture(0)
-                    return
+            #     if frame is None:
+            #         print("⚠️ MindVision lost → switching to webcam")
+            #         self.use_mindvision = False
+            #         self.cap = cv2.VideoCapture(0)
+            #         return
 
 
-                # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            #     # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            # =========================
-            # WEBCAM
-            # =========================
-            elif self.cap:
-                ret, frame = self.cap.read()
-                if not ret:
-                    return
+            # # =========================
+            # # WEBCAM
+            # # =========================
+            # elif self.cap:
+            #     ret, frame = self.cap.read()
+            #     if not ret:
+            #         return
 
-            else:
-                return
+            # else:
+            #     return
             
             # =========================
             # 🔥 ROTATE FRAME
             # =========================
-            frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            # frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
-            frame = cv2.imread(r"D:\Texa\sliver\sliver-design\Sliver_Data\WhatsApp Image 2026-04-29 at 2.33.25 PM.jpeg")
+            frame = cv2.imread(r"/home/texa_developer/Divya Data/i_sliver-design/img_0001.bmp")
 
             # =========================defect_path
             # SAVE CURRENT FRAME
@@ -1359,8 +1359,18 @@ class Bridge(QObject):
                 print("❌ Hourly PDF generation failed. Mail not sent.")
                 return
 
+            from path import INVOICE_PDF, HOURWISE_PDF_REPORTS_DIR
             from classes.send_mail import send_last_generated_pdf
+            from datetime import datetime
+            import shutil
             import threading
+
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            save_pdf_path = HOURWISE_PDF_REPORTS_DIR / f"hourly_report_{timestamp}.pdf"
+
+            shutil.copy2(str(INVOICE_PDF), str(save_pdf_path))
+
+            print("✅ Hourwise PDF saved:", save_pdf_path)
 
             threading.Thread(
                 target=send_last_generated_pdf,
