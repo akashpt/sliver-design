@@ -78,7 +78,7 @@ PREDICTION_IMAGES_DIR = DATA_DIR / "prediction_images"
 #STORAGE
 STORAGE_FILE = RUN_DIR / "storage.json"
 #INVOICE
-INVOICE_PDF = RUN_DIR / "belt-invoice.pdf"
+INVOICE_PDF = RUN_DIR / "sliver-report.pdf"
 # PDF REPORT BACKUP FOLDERS
 PDF_REPORTS_DIR = RUN_DIR / "pdf_reports"
 HOURWISE_PDF_REPORTS_DIR = PDF_REPORTS_DIR / "hourwise"

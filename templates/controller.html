@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TEXA – Controller</title>
+   <link rel="stylesheet" href="../static/css/all.min.css" />
+  <link rel="stylesheet" href="../static/css/controller.css" />
+ <link rel="stylesheet" href="../static/css/style.css" />
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+</head>
+
+<body>
+  <div class="app">
+    <!-- ═══ TOPBAR ═══ -->
+    <header>
+      <div class="logo-icon">
+        <a href="index.html">
+          <img src="../static/img/logo/logo.png" alt="" />
+        </a>
+      </div>
+      <div class="brand">
+        <div class="brand-name">Sliver Strip Detection</div>
+        <div class="brand-sub">Industrial Vision System</div>
+      </div>
+
+      <div class="header-pills">
+        <div class="pill">
+          <span class="pill-dot" id="jobColorDot" style="background: #16a34a"></span>
+          <span class="pill-lbl">JOB ID</span>
+          <span class="pill-val" id="jobIdLabel">—</span>
+        </div>
+        <div class="pill">
+          <span class="pill-dot live" id="statusDot"></span>
+          <span class="pill-lbl">STATUS</span>
+          <span class="pill-val" id="statusLabel">STANDBY</span>
+        </div>
+        <div class="pill">
+          <span class="pill-lbl">STORAGE</span>
+          <span class="pill-val" id="storageLabel">Used: 0% | Free: 0%</span>
+        </div>
+        <!-- <div class="pill">
+          <span class="pill-lbl">DEFECTS</span>
+          <span class="pill-val" id="hdrDefects">0</span>
+        </div> -->
+
+        <!-- <div class="pill">
+          <span class="pill-lbl">ACCURACY</span>
+          <span class="pill-val">98.4%</span>
+        </div> -->
+      </div>
+
+      <div class="hdr-clock" id="clock">--:--:--</div>
+    </header>
+
+    <div class="body-wrap">
+      <!-- ═══ SIDEBAR ═══ -->
+      <aside>
+        <div class="sec-lbl">Menu</div>
+        <a href="index.html" class="nav-btn active" id="menuDashboard">
+          <i class="fa-solid fa-gauge"></i> Dashboard
+        </a>
+        <div class="nav-btn" onclick="bridge?.goReport()" id="menuReport">
+          <i class="fas fa-file-lines"></i> Report
+        </div>
+        <a
+          class="nav-btn"
+          href="controller.html"
+          
+        >
+          <i class="fas fa-sliders"></i> Controller
+      </a>
+        <div _href="training.html" onclick="bridge?.goTraining()" class="nav-btn" id="menuTraining">
+          <i class="fas fa-graduation-cap"></i> Training
+        </div>
+        <button class="nav-btn" onclick="openSettings()" id="menuSettings">
+          <i class="fas fa-gear"></i> Settings
+        </button>
+
+      
+      </aside>
+
+      <!-- ═══ MAIN ═══ -->
+      <main class="ctrl-main">
+        <!-- ── PAGE HEADER ── -->
+        <div class="ctrl-page-header">
+          <div class="ctrl-page-header-left">
+            <div class="ctrl-page-icon">
+              <i class="fa-solid fa-sliders"></i>
+            </div>
+            <div>
+              <div class="ctrl-page-name">Controller Settings</div>
+              <div class="ctrl-page-sub">
+                Connection, exposure &amp; I/O controls
+              </div>
+            </div>
+          </div>
+          <div class="ctrl-status-badge d-none" id="globalStatus">
+            <span class="ctrl-status-dot pulse"></span>
+            <span class="ctrl-status-text">Connecting…</span>
+          </div>
+          <div class="conn-refresh-row">
+            <button class="prim-btn" id="connRefreshBtn" onclick="checkConnection()">
+              <i class="fa-solid fa-rotate-right"></i>Refresh
+            </button>
+          </div>
+        </div>
+
+        <!-- ── TOP ROW: Exposure + Connection ── -->
+        <div class="ctrl-grid-2">
+          <!-- ① EXPOSURE CARD -->
+          <div class="ctrl-card">
+            <div class="ctrl-card-head accent-blue">
+              <div class="ctrl-card-head-icon">
+                <i class="fa-solid fa-camera"></i>
+              </div>
+              <div>
+                <div class="ctrl-card-title">Exposure</div>
+                <div class="ctrl-card-desc">Camera exposure time (µs)</div>
+              </div>
+            </div>
+            <div class="ctrl-card-body">
+              <label class="ctrl-field-label">Exposure Value (µs)</label>
+              <div class="ctrl-inline-row">
+                <input type="number" id="exposureInput" class="ctrl-input" min="0" max="100000" step="1"
+                  inputmode="numeric" pattern="[0-9]*" placeholder="e.g. 500" />
+                <button class="prim-btn" id="ctrlApplyBtn">
+                  <i class="fa-solid fa-check"></i>Apply
+                </button>
+              </div>
+              <div class="ctrl-hint">
+                <i class="fa-solid fa-circle-info"></i>
+                Recommended: 100 – 10,000 µs
+              </div>
+            </div>
+          </div>
+
+          <!-- ② CONNECTION CARD (auto-checked on load, no manual controls) -->
+          <div class="ctrl-card">
+            <div class="ctrl-card-head accent-brand">
+              <div class="ctrl-card-head-icon">
+                <i class="fa-solid fa-network-wired"></i>
+              </div>
+              <div>
+                <div class="ctrl-card-title">Connection</div>
+                <div class="ctrl-card-desc">
+                  Modbus link status — checked automatically
+                </div>
+              </div>
+            </div>
+            <div class="ctrl-card-body conn-card-body">
+              <div class="conn-status-wrap" id="connBanner">
+                <div class="conn-dot-large pulse" id="connDot"></div>
+                <div>
+                  <div class="conn-status-text" id="connText">
+                    Checking connection…
+                  </div>
+                  <div class="conn-status-sub" id="connSub">Please wait</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+        <!-- end .ctrl-grid-2 -->
+
+        <!-- ③ MODE CARD -->
+        <div id="modeSection" class="hidden-section">
+          <div class="ctrl-card">
+            <div class="ctrl-card-head accent-green">
+              <div class="ctrl-card-head-icon">
+                <i class="fa-solid fa-circle-half-stroke"></i>
+              </div>
+              <div>
+                <div class="ctrl-card-title">Operation Mode</div>
+                <div class="ctrl-card-desc">Operation mode control</div>
+              </div>
+              <span class="mode-status-pill" id="modeStatusPill">IDLE</span>
+            </div>
+            <div class="ctrl-card-body d-none">
+              <div class="mode-seg " id="modeSeg" data-mode="none">
+                <div class="mode-seg-glider" id="modeGlider"></div>
+                <button class="mode-seg-opt" id="btnAuto" data-active="false">
+                  <i class="fa-solid fa-bolt"></i><span>AUTO</span>
+                </button>
+                <button class="mode-seg-opt" id="btnManual" data-active="false">
+                  <i class="fa-solid fa-hand"></i><span>MANUAL</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ④ MANUAL CONTROLS — 6 toggles -->
+        <div id="manualSection" class="hidden-section">
+          <div class="ctrl-card">
+            <div class="ctrl-card-head accent-amber">
+              <div class="ctrl-card-head-icon">
+                <i class="fa-solid fa-wrench"></i>
+              </div>
+              <div>
+                <div class="ctrl-card-title">Manual Controls</div>
+                <div class="ctrl-card-desc">
+                  Manual I/O controls — click to toggle
+                </div>
+              </div>
+            </div>
+            <div class="ctrl-card-body">
+              <div class="io-grid">
+
+                <!-- Gripper -->
+                <div class="io-box" id="gripperCard" data-on="false">
+                  <div class="io-box-top">
+                    <div class="io-box-icon">
+                      <i class="fa-solid fa-hand-rock"></i>
+                    </div>
+                    <label class="sw">
+                      <input type="checkbox" id="gripperToggle" data-device="gripper" data-fn="setGripper" />
+                      <span class="sw-track"></span>
+                    </label>
+                  </div>
+                  <div class="io-box-name">Gripper</div>
+                  <div class="io-box-sub">Mechanical grip actuator</div>
+                  <div class="io-box-status-wrap">
+                    <span class="io-state-off">
+                      <i class="fa-solid fa-circle-xmark"></i> Gripper is OFF
+                    </span>
+                    <span class="io-state-on d-none">
+                      <i class="fa-solid fa-circle-check"></i> Gripper is ON
+                    </span>
+                  </div>
+                </div>
+
+                <!-- UV Light -->
+                <div class="io-box" id="uvCard" data-on="false">
+                  <div class="io-box-top">
+                    <div class="io-box-icon">
+                      <i class="fa-solid fa-sun"></i>
+                    </div>
+                    <label class="sw">
+                      <input type="checkbox" id="uvToggle" data-device="uv" data-fn="setUVLight" />
+                      <span class="sw-track"></span>
+                    </label>
+                  </div>
+                  <div class="io-box-name">UV Light</div>
+                  <div class="io-box-sub">Ultraviolet illumination</div>
+                  <div class="io-box-status-wrap">
+                    <span class="io-state-off">
+                      <i class="fa-solid fa-circle-xmark"></i> UV Light is OFF
+                    </span>
+                    <span class="io-state-on d-none">
+                      <i class="fa-solid fa-circle-check"></i> UV Light is ON
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Relay 1 -->
+                <div class="io-box" id="relay1Card" data-on="false">
+                  <div class="io-box-top">
+                    <div class="io-box-icon">
+                      <i class="fa-solid fa-bolt"></i>
+                    </div>
+                    <label class="sw">
+                      <input type="checkbox" id="relay1Toggle" data-device="relay1" data-fn="setRelay1" />
+                      <span class="sw-track"></span>
+                    </label>
+                  </div>
+                  <div class="io-box-name">Relay 1</div>
+                  <div class="io-box-sub">Output relay channel 1</div>
+                  <div class="io-box-status-wrap">
+                    <span class="io-state-off">
+                      <i class="fa-solid fa-circle-xmark"></i> Relay 1 is OFF
+                    </span>
+                    <span class="io-state-on d-none">
+                      <i class="fa-solid fa-circle-check"></i> Relay 1 is ON
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Relay 2 -->
+                <div class="io-box" id="relay2Card" data-on="false">
+                  <div class="io-box-top">
+                    <div class="io-box-icon">
+                      <i class="fa-solid fa-bolt"></i>
+                    </div>
+                    <label class="sw">
+                      <input type="checkbox" id="relay2Toggle" data-device="relay2" data-fn="setRelay2" />
+                      <span class="sw-track"></span>
+                    </label>
+                  </div>
+                  <div class="io-box-name">Relay 2</div>
+                  <div class="io-box-sub">Output relay channel 2</div>
+                  <div class="io-box-status-wrap">
+                    <span class="io-state-off">
+                      <i class="fa-solid fa-circle-xmark"></i> Relay 2 is OFF
+                    </span>
+                    <span class="io-state-on d-none">
+                      <i class="fa-solid fa-circle-check"></i> Relay 2 is ON
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Conveyor Belt -->
+                <div class="io-box" id="conveyorCard" data-on="false">
+                  <div class="io-box-top">
+                    <div class="io-box-icon">
+                      <i class="fa-solid fa-arrows-left-right"></i>
+                    </div>
+                    <label class="sw">
+                      <input type="checkbox" id="conveyorToggle" data-device="conveyor" data-fn="setConveyor" />
+                      <span class="sw-track"></span>
+                    </label>
+                  </div>
+                  <div class="io-box-name">Conveyor Belt</div>
+                  <div class="io-box-sub">Belt motor control</div>
+                  <div class="io-box-status-wrap">
+                    <span class="io-state-off">
+                      <i class="fa-solid fa-circle-xmark"></i> Conveyor Belt is OFF
+                    </span>
+                    <span class="io-state-on d-none">
+                      <i class="fa-solid fa-circle-check"></i> Conveyor Belt is ON
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Sensor Light -->
+                <div class="io-box" id="sensorCard" data-on="false">
+                  <div class="io-box-top">
+                    <div class="io-box-icon">
+                      <i class="fa-solid fa-lightbulb"></i>
+                    </div>
+                    <label class="sw">
+                      <input type="checkbox" id="sensorToggle" data-device="sensor" data-fn="setSensorLight" />
+                      <span class="sw-track"></span>
+                    </label>
+                  </div>
+                  <div class="io-box-name">Sensor Light</div>
+                  <div class="io-box-sub">Inspection ring light</div>
+                  <div class="io-box-status-wrap">
+                    <span class="io-state-off">
+                      <i class="fa-solid fa-circle-xmark"></i> Sensor Light is OFF
+                    </span>
+                    <span class="io-state-on d-none">
+                      <i class="fa-solid fa-circle-check"></i> Sensor Light is ON
+                    </span>
+                  </div>
+                </div>
+
+              </div>
+              <!-- end .io-grid -->
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+
+  <!-- ═══ ERROR MODAL ═══ -->
+  <div class="err-overlay" id="errOverlay" style="display: none">
+    <div class="err-box">
+      <div class="err-icon-ring">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+      <div class="err-title">Error</div>
+      <div class="err-msg" id="errMsg"></div>
+      <button class="err-dismiss-btn" id="errDismiss">
+        <i class="fa-solid fa-xmark"></i>Dismiss
+      </button>
+    </div>
+  </div>
+  <script src="../static/script/controller.js"></script>
+</body>
+
+</html>

@@ -1,13 +1,15 @@
 # app.py
 import sys
 import os
+import json
+from datetime import datetime
 from PyQt5.QtWidgets import QApplication, QMainWindow
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtCore import QUrl
 from pathlib import Path
 from classes.bridge import Bridge
-from path import TEMPLATES_DIR,REPORT_PAGE
+from path import TEMPLATES_DIR,REPORT_PAGE,SETTINGS_FILE
 
 IS_WINDOWS = sys.platform.startswith("win")
 IS_LINUX = sys.platform.startswith("linux")
@@ -33,6 +35,46 @@ else:
     import cv2 as _cv2
     qt_plugin_path = os.path.join(os.path.dirname(_cv2.__file__), "qt", "plugins", "platforms")
     os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = qt_plugin_path
+
+def load_app_settings():
+    default_settings = {
+        "job_id": "",
+        "threshold": "",
+        "camera_name": "MindVision",
+        "exposure": 6000,
+        "min_exposure": 31,
+        "max_exposure": 4063201,
+        "lastSaved": datetime.now().isoformat()
+    }
+
+    try:
+        config = {}
+
+        if SETTINGS_FILE.exists():
+            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                config = json.load(f)
+
+        changed = False
+
+        for key, value in default_settings.items():
+            if key not in config:
+                config[key] = value
+                changed = True
+
+        if changed:
+            with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=2)
+
+        print("✅ settings.json loaded:", config)
+        return config
+
+    except Exception as e:
+        print("❌ settings.json load error:", e)
+
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(default_settings, f, indent=2)
+
+        return default_settings
 
 
 
@@ -123,6 +165,7 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     from classes.database import init_db
     init_db()
+    load_app_settings() 
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()

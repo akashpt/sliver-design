@@ -33,8 +33,8 @@ class InvoicePDFGenerator:
             pass
         return {}
 
-    # def _fetch_report_data(self):
-    def _fetch_report_data(self, start_time=None, end_time=None):
+    # def _fetch_report_data(self, start_time=None, end_time=None):
+    def _fetch_report_data(self, start_time=None, end_time=None, force_report_start_time=None, force_report_end_time=None):
         conn = sqlite3.connect(self.db_path)
         cur = conn.cursor()
 
@@ -81,6 +81,12 @@ class InvoicePDFGenerator:
         """, (job_id, *time_params, job_id))
 
         summary = cur.fetchone()
+        if summary and force_report_start_time and force_report_end_time:
+            summary = list(summary)
+            summary[7] = force_report_start_time
+            summary[8] = force_report_end_time
+            summary = tuple(summary)
+
         print("PDF SUMMARY =", summary)
 
         cur.execute(f"""
@@ -97,8 +103,7 @@ class InvoicePDFGenerator:
             AND job_id = ?
             AND LOWER(COALESCE(result,'')) IN ('defect','bad','strip missing')
             ORDER BY datetime(created_time) DESC
-            LIMIT 20
-        """,((*time_params, job_id)))
+        """,((*time_params, job_id)))#if want to limit the images in the report, add "LIMIT 10" at the end of this query 10 id no of images 
 
         defects = cur.fetchall()
 
@@ -109,16 +114,21 @@ class InvoicePDFGenerator:
         pattern = rf'(<table class="{class_name}">)(.*?)(</table>)'
         return re.sub(pattern, rf'\1{rows_html}\3', html, flags=re.S)
 
-    # def build_html(self):
-    def build_html(self, start_time=None, end_time=None):
+    # def build_html(self, start_time=None, end_time=None):
+    def build_html(self, start_time=None, end_time=None, force_report_start_time=None, force_report_end_time=None):
         html = Path(REPORT_NEW).read_text(encoding="utf-8")
 
         logo_path = self._file_uri(IMG_DIR / "logo" / "logo.png")
         html = re.sub(r'src=".*logo\.png"', f'src="{logo_path}"', html)
 
         training = self._read_training_settings()
-        # summary, defects = self._fetch_report_data()
-        summary, defects = self._fetch_report_data(start_time, end_time)
+        # summary, defects = self._fetch_report_data(start_time, end_time)
+        summary, defects = self._fetch_report_data(
+            start_time,
+            end_time,
+            force_report_start_time,
+            force_report_end_time
+        )
 
         inspected = summary[0] or 0
         good = summary[1] or 0
@@ -212,14 +222,20 @@ class InvoicePDFGenerator:
 
         return html
 
-    # def generate_pdf(self, parent=None, finished_callback=None):
-    def generate_pdf(self, parent=None, finished_callback=None, start_time=None, end_time=None):
+    # def generate_pdf(self, parent=None, finished_callback=None, start_time=None, end_time=None):
+    def generate_pdf(self,parent=None,finished_callback=None,start_time=None,end_time=None,force_report_start_time=None,
+    force_report_end_time=None):
         try:
             print("🔥 Invoice PDF generation started")
             print("Output PDF:", INVOICE_PDF)
 
-            # html = self.build_html()
-            summary, defects = self._fetch_report_data(start_time, end_time)
+            # summary, defects = self._fetch_report_data(start_time, end_time)
+            summary, defects = self._fetch_report_data(
+                start_time,
+                end_time,
+                force_report_start_time,
+                force_report_end_time
+            )
 
             inspected = summary[0] if summary and summary[0] is not None else 0
 
@@ -229,7 +245,13 @@ class InvoicePDFGenerator:
                     finished_callback(False)
                 return
 
-            html = self.build_html(start_time, end_time)
+            # html = self.build_html(start_time, end_time)
+            html = self.build_html(
+                start_time,
+                end_time,
+                force_report_start_time,
+                force_report_end_time
+            )
 
             pdf_path = Path(INVOICE_PDF)
             pdf_path.parent.mkdir(parents=True, exist_ok=True)

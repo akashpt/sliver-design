@@ -65,19 +65,14 @@
         <div class="nav-btn" onclick="bridge?.goReport()" id="menuReport">
           <i class="fas fa-file-lines"></i> Report
         </div>
-        <button
+        <a
           class="nav-btn"
-          onclick="showToast('Controller panel opening...', 3000)"
-          id="menuController"
+          href="controller.html"
+          
         >
           <i class="fas fa-sliders"></i> Controller
-        </button>
-        <div
-          _href="training.html"
-          onclick="bridge?.goTraining()"
-          class="nav-btn"
-          id="menuTraining"
-        >
+      </a>
+        <div _href="training.html" onclick="bridge?.goTraining()" class="nav-btn" id="menuTraining">
           <i class="fas fa-graduation-cap"></i> Training
         </div>
         <button class="nav-btn" onclick="openSettings()" id="menuSettings">

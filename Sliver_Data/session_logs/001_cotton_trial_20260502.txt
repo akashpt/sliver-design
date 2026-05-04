@@ -1,0 +1,9 @@
+job_id: 001_cotton_trial
+threshold: 3
+lastSaved: 02-05-2026 17:07:30
+start time: 02-05-2026 17:07:26
+end time: 02-05-2026 17:07:30
+inspected: 12
+good: 12
+bad: 0
+ignored frame count: 0

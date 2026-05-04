@@ -5,7 +5,8 @@ import os
 import sqlite3
 import random
 import shutil
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta,time
+from pathlib import Path
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QTimer, QStandardPaths, QDir
 from PyQt5.QtWidgets import QApplication  # Only if needed elsewhere
 from classes.mindvision import MindVisionCamera
@@ -13,6 +14,8 @@ from path import DB_FILE,SETTINGS_FILE, TRAINING_IMAGES_DIR, SESSION_LOG_DIR, PR
 from classes.training import StripColorTraining
 from classes.prediction import StripColorPrediction
 from classes.modbus_relay_code import *
+from classes.invoice_pdf import InvoicePDFGenerator
+# from datetime import datetime, time
 # from classes.report import ReportManager
 
 class Bridge(QObject):
@@ -33,6 +36,7 @@ class Bridge(QObject):
         self.camera = None  
         self.cap = None
         self.use_mindvision = False
+        self.mindvision_fail_count = 0
         self.camera_open = False
         self.current_frame = None
         self.defect_active = False
@@ -54,10 +58,12 @@ class Bridge(QObject):
         self.count_time.timeout.connect(self.count_show)
         self.count_time.start(1000)
         self.pdf_mail_timer = QTimer()
-        self.pdf_mail_timer.timeout.connect(self.send_hourly_pdf_mail)
+        self.pdf_mail_timer.timeout.connect(self.send_shift_pdf_mail)
         # self.pdf_mail_timer.start(60 * 60 * 1000)  # 1 hour
         self.pdf_mail_timer.start(60 * 1000)  # 1 minute testing
         # self.pdf_mail_timer.start(10000)  # 10 seconds (testing)
+        self.current_shift_name = ""
+        self.last_sent_shift_key = ""
         self.inspected = 0
         self.good = 0
         self.bad = 0
@@ -89,14 +95,18 @@ class Bridge(QObject):
     def saveUserConfig(self, job_id, threshold):
         # print("🔥 saveUserConfig CALLED") 
         try:
-            data = {
-                "job_id": job_id,
-                "threshold": threshold,
-                "lastSaved": datetime.now().isoformat(),
-            }
+            config = {}
+
+            if os.path.exists(self.config_path):
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+
+            config["job_id"] = job_id
+            config["threshold"] = threshold
+            config["lastSaved"] = datetime.now().isoformat()
 
             with open(self.config_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)  #w py dict into json
+                json.dump(config, f, indent=2) #w py dict into json
 
             print("✅ Process Confirmed")
             print("Job:", job_id)
@@ -106,7 +116,7 @@ class Bridge(QObject):
             return json.dumps({
                 "status": "success",
                 "message": "Process Confirmed",
-                "data": data
+                "data": config
             }) #con py dict to json str
         
         
@@ -132,14 +142,18 @@ class Bridge(QObject):
     @pyqtSlot()
     def resetUserConfig(self):
         try:
-            empty_config = {
-                "job_id": "",
-                "threshold": "",
-                "lastSaved": datetime.now().isoformat()
-            }
+            config = {}
+
+            if os.path.exists(self.config_path):
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+
+            config["job_id"] = ""
+            config["threshold"] = ""
+            config["lastSaved"] = datetime.now().isoformat()
 
             with open(self.config_path, "w", encoding="utf-8") as f:
-                json.dump(empty_config, f, indent=2)
+                json.dump(config, f, indent=2)
 
             self.inspected = 0
             self.good = 0
@@ -206,6 +220,47 @@ class Bridge(QObject):
         except Exception as e:
             print(f"❌ save_training_image error: {e}")
             return ""
+
+    def get_saved_exposure(self):
+        exposure = 30000
+
+        try:
+            if os.path.exists(self.config_path):
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+                    exposure = int(config.get("exposure", 30000))
+        except Exception as e:
+            print("⚠️ Exposure config read error:", e)
+            exposure = 30000
+
+        return exposure
+
+
+    def apply_webcam_exposure(self, exposure):
+        try:
+            import subprocess
+
+            # 🔥 Convert UI exposure (0–10000) → webcam range (10–625)
+            cam_exp = max(10, min(625, int(exposure / 20)))
+
+            # Step 1: Set manual mode
+            subprocess.run(
+                ["v4l2-ctl", "-d", "/dev/video0", "--set-ctrl=auto_exposure=1"],
+                check=False
+            )
+
+            # Step 2: Set exposure
+            subprocess.run(
+                ["v4l2-ctl", "-d", "/dev/video0", f"--set-ctrl=exposure_time_absolute={cam_exp}"],
+                check=False
+            )
+
+            print("📷 Webcam exposure applied via v4l2:")
+            print("UI exposure =", exposure)
+            print("Camera exposure =", cam_exp)
+
+        except Exception as e:
+            print("❌ apply_webcam_exposure error:", e)
 
     @pyqtSlot(str, result=str)
     def appendTraining(self, image_path):
@@ -293,7 +348,11 @@ class Bridge(QObject):
             self.load_db_counts_for_job(job_id)
 
         try:
-            self.camera = MindVisionCamera()
+            # self.camera = MindVisionCamera()
+            exposure = self.get_saved_exposure()
+            self.camera = MindVisionCamera(exposure_us=exposure)
+            print("📷 Camera starting with exposure:", exposure)
+
             self.camera.start()
 
             if self.camera.hCamera != 0:
@@ -316,6 +375,7 @@ class Bridge(QObject):
                 return "Camera not available"
 
             print("✅ Using Webcam")
+            self.apply_webcam_exposure(exposure)            
 
         self.camera_open = True
 
@@ -454,7 +514,7 @@ class Bridge(QObject):
             # =========================
             # frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
-            frame = cv2.imread(r"/home/texa_developer/Divya Data/i_sliver-design/img_0001.bmp")
+            frame = cv2.imread(r"/home/texa_developer/Divya Data/i_sliver-design/strips.jpeg")
             # frame = cv2.imread(r"D:\Texa\sliver\sliver-design\Sliver_Data\WhatsApp Image 2026-04-29 at 2.33.25 PM.jpeg")
 
             # =========================defect_path
@@ -567,7 +627,6 @@ class Bridge(QObject):
                         from classes.send_mail import send_email_with_attachments
                         import threading
 
-                        # ✅ ADD HERE
                         defect_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                         frame_no = self.inspected
                         material = job_id
@@ -770,8 +829,8 @@ class Bridge(QObject):
                 if saved_job_id in jobs:
                     job_id = saved_job_id
 
-            if not job_id and jobs:
-                job_id = jobs[0]
+            # if not job_id and jobs:
+            #     job_id = jobs[0]
 
             # latest threshold from DB for selected job
             latest_db_threshold = self.get_latest_threshold_from_report(job_id)
@@ -810,7 +869,31 @@ class Bridge(QObject):
 
             return json.dumps(data)
 
-    def save_report_entry(self, result_status, bad_image_path="", total_strips=0,bad_strips=0,bad_strip_number=""):
+    def get_current_shift_name(self, cursor):
+        try:
+            now_time = datetime.now().strftime("%H:%M:%S")
+
+            cursor.execute("""
+                SELECT shift_name
+                FROM SHIFT
+                WHERE active = 1
+                AND time(?) >= time(start_time)
+                AND time(?) < time(end_time)
+                LIMIT 1
+            """, (now_time, now_time))
+
+            row = cursor.fetchone()
+
+            if row:
+                return row[0]
+
+            return ""
+
+        except Exception as e:
+            print("❌ get_current_shift_name error:", e)
+            return ""
+
+    def save_report_entry(self, result_status, bad_image_path="", total_strips=0, bad_strips=0, bad_strip_number=""):
         try:
             job_id, threshold = self.get_job_from_config()
 
@@ -821,9 +904,17 @@ class Bridge(QObject):
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
 
+            # ✅ Get current shift_name
+            shift_name = self.get_current_shift_name(cursor)
+
+            if not shift_name:
+                print("⚠️ No active shift found")
+                shift_name = "-"
+
+            # ✅ Insert into REPORT
             cursor.execute("""
                 INSERT INTO REPORT (
-                    shift_id,
+                    shift_name,
                     machine_no,
                     job_id,
                     threshold,
@@ -835,7 +926,7 @@ class Bridge(QObject):
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                1,
+                shift_name,
                 "M1",
                 job_id,
                 str(threshold) if threshold is not None else "",
@@ -852,8 +943,8 @@ class Bridge(QObject):
             self.get_system_storage()
 
             print(
-                f"✅ Report row inserted: job_id={job_id}, threshold={threshold}, "
-                f"status={result_status}, image={bad_image_path}"
+                f"✅ Report row inserted: shift_name={shift_name}, job_id={job_id}, "
+                f"threshold={threshold}, status={result_status}, image={bad_image_path}"
             )
 
         except Exception as e:
@@ -1360,6 +1451,86 @@ class Bridge(QObject):
                 "ok": False,
                 "message": str(e)
             })
+
+    # =============== CONTROLLER PAGE METHODS ========================
+    @pyqtSlot(str, str, result=str)
+    def cameraControl(self, action, value=""):
+        try:
+            if action == "getCameraDetails":
+                config = {}
+
+                if os.path.exists(self.config_path):
+                    with open(self.config_path, "r", encoding="utf-8") as f:
+                        config = json.load(f)
+
+                return json.dumps({
+                    "ok": True,
+                    "camera_name": config.get("camera_name", "MindVision"),
+                    "min": int(config.get("min_exposure", 31)),
+                    "max": int(config.get("max_exposure", 4063201))
+                })
+            if action == "getExposure":
+                config = {}
+
+                if os.path.exists(self.config_path):
+                    with open(self.config_path, "r", encoding="utf-8") as f:
+                        config = json.load(f)
+
+                return json.dumps({
+                    "ok": True,
+                    "value": config.get("exposure", 30000)
+                })
+
+            if action == "setExposure":
+                exposure = int(value)
+
+                config = {}
+                if os.path.exists(self.config_path):
+                    with open(self.config_path, "r", encoding="utf-8") as f:
+                        config = json.load(f)
+
+                min_exp = int(config.get("min_exposure", 31))
+                max_exp = int(config.get("max_exposure", 4063201))
+
+                # ✅ Validation using JSON values
+                if exposure < min_exp or exposure > max_exp:
+                    return json.dumps({
+                        "ok": False,
+                        "message": f"Exposure must be between {min_exp} and {max_exp}"
+                    })
+
+                # ✅ Save back to JSON
+                config["camera_name"] = config.get("camera_name", "MindVision")
+                config["exposure"] = exposure
+                config["min_exposure"] = min_exp
+                config["max_exposure"] = max_exp
+
+                with open(self.config_path, "w", encoding="utf-8") as f:
+                    json.dump(config, f, indent=2)
+
+                return json.dumps({
+                    "ok": True,
+                    "value": exposure
+                })
+    
+        except Exception as e:
+            return json.dumps({
+                "ok": False,
+                "message": str(e)
+            })
+
+    @pyqtSlot(result=str)
+    def checkPlcConnection(self):
+        try:
+            return json.dumps({
+                "ok": False,
+                "message": "Not Connected"
+            })
+        except Exception as e:
+            return json.dumps({
+                "ok": False,
+                "message": str(e)
+            })
     # ====================== REPORT SUMMARY End ======================
 
 # invoice viewer slot 
@@ -1409,40 +1580,110 @@ class Bridge(QObject):
 
         except Exception as e:
             print("❌ _open_invoice_after_pdf error:", e)
-    
-    def send_hourly_pdf_mail(self):
-        try:
-            from classes.invoice_pdf import InvoicePDFGenerator
 
-            print("🔥 Hourly PDF generation started")
-            end_time = datetime.now()
-            start_time = end_time - timedelta(hours=1)
+    # def send_hourly_pdf_mail(self):
+    #     try:
+    #         from classes.invoice_pdf import InvoicePDFGenerator
+
+    #         print("🔥 Hourly PDF generation started")
+    #         end_time = datetime.now()
+    #         start_time = end_time - timedelta(hours=1)
+
+    #         start_time_str = start_time.strftime("%Y-%m-%d %H:%M:%S")
+    #         end_time_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
+
+    #         print("⏰ Hourly PDF range:", start_time_str, "to", end_time_str)
+
+    #         self.hourly_pdf_generator = InvoicePDFGenerator()
+    #         self.hourly_pdf_generator.generate_pdf(
+    #             parent=self.app_ref,
+    #             finished_callback=self._send_pdf_after_generate,
+    #             start_time=start_time_str,
+    #             end_time=end_time_str
+    #         )
+    #         # self.hourly_pdf_generator.generate_pdf(
+    #         #     parent=self.app_ref,
+    #         #     finished_callback=self._send_pdf_after_generate
+    #         # )
+
+    #     except Exception as e:
+    #         print("❌ send_hourly_pdf_mail error:", e)
+    
+    def send_shift_pdf_mail(self):
+        try:
+            now = datetime.now()
+            today = now.date()
+
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT shift_name, start_time, end_time
+                FROM SHIFT
+                WHERE active = 1
+            """)
+
+            rows = cursor.fetchall()
+            conn.close()
+
+            current_shift = None
+
+            for shift_name, start_str, end_str in rows:
+                start_str = str(start_str).strip()
+                end_str = str(end_str).strip()
+
+                start_t = datetime.strptime(start_str[:8], "%H:%M:%S").time()
+                end_t = datetime.strptime(end_str[:8], "%H:%M:%S").time()
+
+                shift_start = datetime.combine(today, start_t)
+                shift_end = datetime.combine(today, end_t)
+
+                if now >= shift_end and now < shift_end + timedelta(minutes=1):
+                    current_shift = (shift_name, shift_start, shift_end)
+                    break
+
+            if not current_shift:
+                return
+
+            shift_name, start_time, end_time = current_shift
+
+            shift_key = f"{shift_name}_{end_time.strftime('%Y%m%d_%H%M')}"
+
+            if self.last_sent_shift_key == shift_key:
+                print("⚠️ Shift PDF already sent:", shift_key)
+                return
+
+            self.last_sent_shift_key = shift_key
+
+            save_shift_name = shift_name.replace(" ", "_").lower()
+            self.current_shift_name = save_shift_name
 
             start_time_str = start_time.strftime("%Y-%m-%d %H:%M:%S")
             end_time_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
 
-            print("⏰ Hourly PDF range:", start_time_str, "to", end_time_str)
+            print("Shift PDF generation started")
+            print("Shift           :", shift_name)
+            print("Shift PDF Timing:", start_time_str, "to", end_time_str)
+
+            self.current_shift_name = shift_name
 
             self.hourly_pdf_generator = InvoicePDFGenerator()
             self.hourly_pdf_generator.generate_pdf(
                 parent=self.app_ref,
                 finished_callback=self._send_pdf_after_generate,
                 start_time=start_time_str,
-                end_time=end_time_str
+                end_time=end_time_str,
+                force_report_start_time=start_time_str,
+                force_report_end_time=end_time_str
             )
-            # self.hourly_pdf_generator.generate_pdf(
-            #     parent=self.app_ref,
-            #     finished_callback=self._send_pdf_after_generate
-            # )
-
         except Exception as e:
-            print("❌ send_hourly_pdf_mail error:", e)
+            print("❌ send_shift_pdf_mail error:", e)
 
 
     def _send_pdf_after_generate(self, ok):
         try:
             if not ok:
-                print("❌ Hourly PDF generation failed. Mail not sent.")
+                print("❌ Shift PDF generation failed. Mail not sent.")
                 return
 
             from path import INVOICE_PDF, HOURWISE_PDF_REPORTS_DIR
@@ -1452,7 +1693,9 @@ class Bridge(QObject):
             import threading
 
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            save_pdf_path = HOURWISE_PDF_REPORTS_DIR / f"hourly_report_{timestamp}.pdf"
+            # save_pdf_path = HOURWISE_PDF_REPORTS_DIR / f"hourly_report_{timestamp}.pdf"
+            shift_name = getattr(self, "current_shift_name", "shift_report")
+            save_pdf_path = HOURWISE_PDF_REPORTS_DIR / f"{shift_name}_{timestamp}.pdf"
 
             shutil.copy2(str(INVOICE_PDF), str(save_pdf_path))
 
