@@ -1,12 +1,10 @@
 {
   "job_id": "001_cotton_trial",
   "threshold": "3",
-  "lastSaved": "2026-05-02T12:19:56.096100",
+  "lastSaved": "2026-05-05T10:12:36.224208",
   "camera_name": "MindVision",
   "exposure": 40000,
   "min_exposure": 31,
   "max_exposure": 4063201,
-  "prediction_interval_value": 5,
-  "prediction_interval_unit": "minutes",
-  "prediction_interval_seconds": 300
+  "prediction_interval_seconds": 20
 }

@@ -289,25 +289,24 @@ class Bridge(QObject):
             return 1
 
 
-    def sync_prediction_interval_from_settings(self):
-        try:
-            new_seconds = self.get_prediction_interval_seconds()
+    # def sync_prediction_interval_from_settings(self):
+    #     try:
+    #         new_seconds = self.get_prediction_interval_seconds()
 
-            if new_seconds != self.last_prediction_interval_seconds:
-                self.pr_time = new_seconds
-                self.last_prediction_interval_seconds = new_seconds
+    #         if new_seconds != self.last_prediction_interval_seconds:
+    #             self.pr_time = new_seconds
+    #             self.last_prediction_interval_seconds = new_seconds
 
-                print(f"⏱ Prediction interval changed to {new_seconds} seconds")
+    #             print(f"⏱ Prediction interval changed to {new_seconds} seconds")
 
-                if self.camera_open and self.process == "prediction":
-                    self.timer.start(new_seconds * 1000)
-                    print(f"✅ Running prediction timer updated: {new_seconds} seconds")
+    #             if self.camera_open and self.process == "prediction":
+    #                 self.timer.start(new_seconds * 1000)
+    #                 print(f"✅ Running prediction timer updated: {new_seconds} seconds")
 
-        except Exception as e:
-            print("❌ sync_prediction_interval_from_settings error:", e)
+    #     except Exception as e:
+    #         print("❌ sync_prediction_interval_from_settings error:", e)
 
 
-    @pyqtSlot(str, str, result=str)
     def savePredictionTiming(self, value, unit):
         try:
             value = int(value)
@@ -560,7 +559,7 @@ class Bridge(QObject):
             print("❌ save_session_txt error:", e)
 
     def count_show(self):
-        self.sync_prediction_interval_from_settings()
+        # self.sync_prediction_interval_from_settings()
         job_id, _ = self.get_job_from_config()
 
         if job_id:
@@ -973,10 +972,10 @@ class Bridge(QObject):
     @pyqtSlot(str, str, str, result=str)
     def saveShift(self, shift_name, start_time, end_time):
         try:
-            print("🔥 saveShift called")
-            print("shift_name =", shift_name)
-            print("start_time =", start_time)
-            print("end_time   =", end_time)
+            # print("🔥 saveShift called")
+            # print("shift_name =", shift_name)
+            # print("start_time =", start_time)
+            # print("end_time   =", end_time)
 
             result = create_new_shift_version(
                 shift_name,
@@ -1395,7 +1394,6 @@ class Bridge(QObject):
             })
             
     
-    # @pyqtSlot(result=str)
     # def get_report_summary(self):
     #     try:
     #         manager = ReportManager()
@@ -1841,6 +1839,7 @@ class Bridge(QObject):
             print("Shift PDF Timing:", start_time_str, "to", end_time_str)
 
             self.current_shift_name = shift_name
+            self.current_shift_date = start_time.strftime("%d-%m-%Y")
 
             self.hourly_pdf_generator = InvoicePDFGenerator()
             self.hourly_pdf_generator.generate_pdf(
@@ -1861,20 +1860,20 @@ class Bridge(QObject):
                 print("❌ Shift PDF generation failed. Mail not sent.")
                 return
 
-            from path import INVOICE_PDF, HOURWISE_PDF_REPORTS_DIR
+            from path import INVOICE_PDF, SHIFTWISE_PDF_REPORTS_DIR
             from classes.send_mail import send_last_generated_pdf
             from datetime import datetime
             import shutil
             import threading
 
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            # save_pdf_path = HOURWISE_PDF_REPORTS_DIR / f"hourly_report_{timestamp}.pdf"
+            shift_date = getattr(self, "current_shift_date", datetime.now().strftime("%d-%m-%Y"))
             shift_name = getattr(self, "current_shift_name", "shift_report")
-            save_pdf_path = HOURWISE_PDF_REPORTS_DIR / f"{shift_name}_{timestamp}.pdf"
+            safe_shift_name = str(shift_name).strip().lower().replace(" ", "_")
+            save_pdf_path = SHIFTWISE_PDF_REPORTS_DIR / f"{shift_date}_{safe_shift_name}.pdf"
 
             shutil.copy2(str(INVOICE_PDF), str(save_pdf_path))
 
-            print("✅ Hourwise PDF saved:", save_pdf_path)
+            print("✅ Shiftwise PDF saved:", save_pdf_path)
 
             threading.Thread(
                 target=send_last_generated_pdf,
