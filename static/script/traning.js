@@ -5,10 +5,13 @@
 // ═══════════════════════════════════════════════════════════════════
 
 document.addEventListener("DOMContentLoaded", function () {
+  window.__qtWebChannelConnecting = true;
+
   new QWebChannel(qt.webChannelTransport, async function (channel) {
+    window.__qtWebChannelConnecting = false;
     window.bridge = channel.objects.bridge;
 
-    if (!bridge) {
+    if (!window.bridge) {
       showToast("⚠️ No Qt Bridge - Using Laptop Webcam", 4000);
       return;
     }
@@ -16,8 +19,8 @@ document.addEventListener("DOMContentLoaded", function () {
     showToast("✅ Bridge Connected Successfully", 3000);
 
     // ✅ CONNECT FRAME SIGNAL ONLY HERE
-    if (bridge.frame_signal) {
-      bridge.frame_signal.connect(function (frame) {
+    if (window.bridge.frame_signal) {
+      window.bridge.frame_signal.connect(function (frame) {
         const img = document.getElementById("bridgeFeed");
         const noFeed = document.getElementById("noFeed");
 

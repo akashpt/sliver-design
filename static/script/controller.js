@@ -6,7 +6,10 @@ function initBridge() {
     let n = 0;
     (function try_() {
       if (window.qt && qt.webChannelTransport) {
+        window.__qtWebChannelConnecting = true;
+
         new QWebChannel(qt.webChannelTransport, (ch) => {
+          window.__qtWebChannelConnecting = false;
           window.bridge = ch.objects.bridge;
           res(window.bridge);
         });

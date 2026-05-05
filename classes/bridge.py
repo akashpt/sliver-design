@@ -5,12 +5,12 @@ import os
 import sqlite3
 import random
 import shutil
-from datetime import datetime, timedelta,time
+from datetime import datetime, timedelta, time as datetime_time
 from pathlib import Path
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QTimer, QStandardPaths, QDir
 from PyQt5.QtWidgets import QApplication  # Only if needed elsewhere
 from classes.mindvision import MindVisionCamera
-from path import DB_FILE,SETTINGS_FILE, TRAINING_IMAGES_DIR, SESSION_LOG_DIR, PREDICTION_IMAGES_DIR, TRAINING_SETTINGS_FILE, MODELS_DIR, EMAIL_PAGE, STORAGE_FILE, INDEX_PAGE, TRAINING_PAGE
+from path import DB_FILE,SETTINGS_FILE, TRAINING_IMAGES_DIR, SESSION_LOG_DIR, PREDICTION_IMAGES_DIR, TRAINING_SETTINGS_FILE, MODELS_DIR, EMAIL_PAGE, STORAGE_FILE, INDEX_PAGE, TRAINING_PAGE, SETTINGS_PAGE
 from classes.training import StripColorTraining
 from classes.prediction import StripColorPrediction
 from classes.modbus_relay_code import *
@@ -1784,6 +1784,18 @@ class Bridge(QObject):
     #     except Exception as e:
     #         print("❌ send_hourly_pdf_mail error:", e)
     
+    def parse_shift_datetime(self, base_date, time_value):
+        raw_time = str(time_value).strip()
+
+        if raw_time in ("24:00", "24:00:00"):
+            return datetime.combine(base_date, datetime_time.min) + timedelta(days=1)
+
+        if len(raw_time) == 5:
+            raw_time = raw_time + ":00"
+
+        parsed_time = datetime.strptime(raw_time[:8], "%H:%M:%S").time()
+        return datetime.combine(base_date, parsed_time)
+
     def send_shift_pdf_mail(self):
         try:
             now = datetime.now()
@@ -1804,17 +1816,18 @@ class Bridge(QObject):
             current_shift = None
 
             for shift_name, start_str, end_str in rows:
-                start_str = str(start_str).strip()
-                end_str = str(end_str).strip()
+                for base_date in (today, today - timedelta(days=1)):
+                    shift_start = self.parse_shift_datetime(base_date, start_str)
+                    shift_end = self.parse_shift_datetime(base_date, end_str)
 
-                start_t = datetime.strptime(start_str[:8], "%H:%M:%S").time()
-                end_t = datetime.strptime(end_str[:8], "%H:%M:%S").time()
+                    if shift_end <= shift_start:
+                        shift_end = shift_end + timedelta(days=1)
 
-                shift_start = datetime.combine(today, start_t)
-                shift_end = datetime.combine(today, end_t)
+                    if now >= shift_end and now < shift_end + timedelta(minutes=1):
+                        current_shift = (shift_name, shift_start, shift_end)
+                        break
 
-                if now >= shift_end and now < shift_end + timedelta(minutes=1):
-                    current_shift = (shift_name, shift_start, shift_end)
+                if current_shift:
                     break
 
             if not current_shift:
@@ -1899,6 +1912,9 @@ class Bridge(QObject):
     def goTraining(self):
         self.app_ref.load_page(TRAINING_PAGE)
 
+    @pyqtSlot()
+    def goSettings(self):
+        self.app_ref.load_page(SETTINGS_PAGE)
     #=====================================================================
     # 👉 467.89 GB = 100% (always)
     # 👉 94.9% is only used + free (incomplete data)

@@ -48,6 +48,7 @@ TEMPLATES_DIR = APP_DIR / "templates"
 
 INDEX_PAGE = TEMPLATES_DIR / "index.html"
 TRAINING_PAGE = TEMPLATES_DIR / "training.html"
+SETTINGS_PAGE = TEMPLATES_DIR / "settings.html"
 CONTROLLER_PAGE = TEMPLATES_DIR / "controller.html"
 REPORT_PAGE = TEMPLATES_DIR / "report.html"
 REPORT_NEW = TEMPLATES_DIR / "report_new.html"

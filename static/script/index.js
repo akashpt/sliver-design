@@ -23,8 +23,12 @@ let currentModalIndex = -1;
 
 // ─── Bridge & Initialization ────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", function () {
+  window.__qtWebChannelConnecting = true;
+
   new QWebChannel(qt.webChannelTransport, async function (channel) {
+    window.__qtWebChannelConnecting = false;
     bridge = channel.objects.bridge;
+    window.bridge = bridge;
     if (bridge) {
       showToast("✅ Bridge Connected Successfully", 3000);
       if (bridge) {

@@ -4,9 +4,11 @@
 
 /* ── Body layout ── */
 .body-wrap {
-  display: flex;
+ 
   flex: 1;
   overflow: hidden;
+  display: grid;
+  grid-template-columns: 200px 1fr;
 }
 
 /* ── Toast ── */
@@ -55,6 +57,7 @@
 .ctrl-main {
   flex: 1;
   overflow-y: auto;
+  height: 90vh;
   background: var(--bg, #eef0f4);
   padding: 24px 28px 48px;
   display: flex;
@@ -770,25 +773,49 @@
   align-items: center;
   gap: 5px;
 }
-.io-state-off i { color: #cbd5e1; }
-.io-state-off i{margin-right: 10px;}
+.io-state-off i {
+  color: #cbd5e1;
+}
+.io-state-off i {
+  margin-right: 10px;
+}
 .io-state-on {
   color: var(--green, #16a34a);
   display: flex;
   align-items: center;
   gap: 5px;
 }
-.io-state-on i { color: var(--green, #16a34a); }
-.io-state-on i{margin-right: 10px;}
+.io-state-on i {
+  color: var(--green, #16a34a);
+}
+.io-state-on i {
+  margin-right: 10px;
+}
 /* Show/hide status spans via data-on on the card */
-.io-box[data-on="true"]  .io-state-off { display: none !important; }
-.io-box[data-on="true"]  .io-state-on  { display: flex !important; }
-.io-box[data-on="false"] .io-state-on  { display: none !important; }
-.io-box[data-on="false"] .io-state-off { display: flex !important; }
+.io-box[data-on="true"] .io-state-off {
+  display: none !important;
+}
+.io-box[data-on="true"] .io-state-on {
+  display: flex !important;
+}
+.io-box[data-on="false"] .io-state-on {
+  display: none !important;
+}
+.io-box[data-on="false"] .io-state-off {
+  display: flex !important;
+}
 
 /* ── Legacy toggle row styles kept for reference (unused) ── */
-.toggle-name { font-size: 13.5px; font-weight: 700; color: var(--text, #18202e); }
-.toggle-sub  { font-size: 11px; color: var(--text-faint, #96a0b0); margin-top: 2px; }
+.toggle-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text, #18202e);
+}
+.toggle-sub {
+  font-size: 11px;
+  color: var(--text-faint, #96a0b0);
+  margin-top: 2px;
+}
 
 /* ================================================================
    SIMPLE TOGGLE SWITCH — PyQt5 WebEngine compatible
