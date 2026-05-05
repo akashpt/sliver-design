@@ -82,7 +82,7 @@ STORAGE_FILE = RUN_DIR / "storage.json"
 INVOICE_PDF = RUN_DIR / "sliver-report.pdf"
 # PDF REPORT BACKUP FOLDERS
 PDF_REPORTS_DIR = RUN_DIR / "pdf_reports"
-HOURWISE_PDF_REPORTS_DIR = PDF_REPORTS_DIR / "hourwise"
+SHIFTWISE_PDF_REPORTS_DIR = PDF_REPORTS_DIR / "shiftwise_reports"
 
 # DATABASE
 DB_FILE = RUN_DIR / "sliver.db"
@@ -113,7 +113,7 @@ TRAINING_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 PREDICTION_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 PDF_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-HOURWISE_PDF_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+SHIFTWISE_PDF_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # =====================================================
 # DEFAULT FILES (SAFE INIT)
