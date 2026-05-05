@@ -1443,6 +1443,38 @@ input[type="range"] {
   text-align: center;
 }
 
+.shift-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  background: #ffffff;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.shift-table th,
+.shift-table td {
+  padding: 9px 8px;
+  border-bottom: 1px solid rgba(90, 25, 31, 0.12);
+  text-align: left;
+}
+
+.shift-table th {
+  background: rgba(90, 25, 31, 0.08);
+  color: var(--primary, #5a191f);
+  font-weight: 700;
+}
+
+.shift-status-active {
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.shift-status-disabled {
+  color: #ef233c;
+  font-weight: 700;
+}
+
 .spinner {
   width: 40px;
   height: 40px;

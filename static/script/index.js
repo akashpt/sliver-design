@@ -1145,49 +1145,49 @@ document.addEventListener("click", function (e) {
 });
 
 // ─── Settings ───────────────────────────────────────────────────────
-function openSettings() {
-  document.getElementById("settingsModal").style.display = "flex";
-  document.getElementById("modeDefault").checked = true;
-  toggleManual();
-}
+// function openSettings() {
+//   document.getElementById("settingsModal").style.display = "flex";
+//   document.getElementById("modeDefault").checked = true;
+//   toggleManual();
+// }
 
-function closeSettings() {
-  document.getElementById("settingsModal").style.display = "none";
-}
+// function closeSettings() {
+//   document.getElementById("settingsModal").style.display = "none";
+// }
 
-function toggleManual() {
-  const isManual =
-    document.querySelector('input[name="mode"]:checked')?.value === "manual";
-  document.getElementById("manualControls").style.display = isManual
-    ? "block"
-    : "none";
-  document.getElementById("defaultInfo").style.display = isManual
-    ? "none"
-    : "block";
-}
+// function toggleManual() {
+//   const isManual =
+//     document.querySelector('input[name="mode"]:checked')?.value === "manual";
+//   document.getElementById("manualControls").style.display = isManual
+//     ? "block"
+//     : "none";
+//   document.getElementById("defaultInfo").style.display = isManual
+//     ? "none"
+//     : "block";
+// }
 
-function saveSettings() {
-  closeSettings();
-  showToast("Settings saved successfully");
-  addLog("Settings updated.");
-}
+// function saveSettings() {
+//   closeSettings();
+//   showToast("Settings saved successfully");
+//   addLog("Settings updated.");
+// }
 
-function switchTab(tabName) {
-  document
-    .querySelectorAll(".modal-tab")
-    .forEach((tab) => tab.classList.remove("active"));
-  document
-    .querySelectorAll(".tab-content")
-    .forEach((content) => content.classList.remove("active"));
+// function switchTab(tabName) {
+//   document
+//     .querySelectorAll(".modal-tab")
+//     .forEach((tab) => tab.classList.remove("active"));
+//   document
+//     .querySelectorAll(".tab-content")
+//     .forEach((content) => content.classList.remove("active"));
 
-  if (tabName === "detection") {
-    document.querySelector(".modal-tab:first-child").classList.add("active");
-    document.getElementById("detectionTab").classList.add("active");
-  } else if (tabName === "threshold") {
-    document.querySelector(".modal-tab:last-child").classList.add("active");
-    document.getElementById("thresholdTab").classList.add("active");
-  }
-}
+//   if (tabName === "detection") {
+//     document.querySelector(".modal-tab:first-child").classList.add("active");
+//     document.getElementById("detectionTab").classList.add("active");
+//   } else if (tabName === "threshold") {
+//     document.querySelector(".modal-tab:last-child").classList.add("active");
+//     document.getElementById("thresholdTab").classList.add("active");
+//   }
+// }
 
 // Modal outside click
 // document.getElementById("defectModal")?.addEventListener("click", (e) => {

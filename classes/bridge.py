@@ -15,6 +15,7 @@ from classes.training import StripColorTraining
 from classes.prediction import StripColorPrediction
 from classes.modbus_relay_code import *
 from classes.invoice_pdf import InvoicePDFGenerator
+from classes.database import create_new_shift_version
 # from datetime import datetime, time
 # from classes.report import ReportManager
 
@@ -29,9 +30,9 @@ class Bridge(QObject):
         super().__init__()
         self.app_ref = app_ref
 
-        #database
         self.db_path = str(DB_FILE)   # set DB path
-
+        self.config_path= str(SETTINGS_FILE)
+        
         # Camera
         self.camera = None  
         self.cap = None
@@ -51,8 +52,12 @@ class Bridge(QObject):
         # Frame timer
         self.timer = QTimer()
         self.timer.timeout.connect(self.grab_frame)
-        self.pr_time = 1  # seconds
+        # Prediction interval from settings.json
+        self.pr_time = self.get_prediction_interval_seconds()
+        self.last_prediction_interval_seconds = self.pr_time
+        # self.pr_time = 1  # seconds
         self.process = None
+        
 
         self.count_time = QTimer()
         self.count_time.timeout.connect(self.count_show)
@@ -262,6 +267,98 @@ class Bridge(QObject):
         except Exception as e:
             print("❌ apply_webcam_exposure error:", e)
 
+    def get_prediction_interval_seconds(self):
+        try:
+            default_seconds = 1
+
+            if not os.path.exists(self.config_path):
+                return default_seconds
+
+            with open(self.config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+
+            seconds = int(config.get("prediction_interval_seconds", default_seconds))
+
+            if seconds < 1:
+                seconds = 1
+
+            return seconds
+
+        except Exception as e:
+            print("❌ get_prediction_interval_seconds error:", e)
+            return 1
+
+
+    def sync_prediction_interval_from_settings(self):
+        try:
+            new_seconds = self.get_prediction_interval_seconds()
+
+            if new_seconds != self.last_prediction_interval_seconds:
+                self.pr_time = new_seconds
+                self.last_prediction_interval_seconds = new_seconds
+
+                print(f"⏱ Prediction interval changed to {new_seconds} seconds")
+
+                if self.camera_open and self.process == "prediction":
+                    self.timer.start(new_seconds * 1000)
+                    print(f"✅ Running prediction timer updated: {new_seconds} seconds")
+
+        except Exception as e:
+            print("❌ sync_prediction_interval_from_settings error:", e)
+
+
+    @pyqtSlot(str, str, result=str)
+    def savePredictionTiming(self, value, unit):
+        try:
+            value = int(value)
+            unit = str(unit).strip().lower()
+
+            if value <= 0:
+                return json.dumps({
+                    "ok": False,
+                    "message": "Prediction timing must be greater than 0"
+                })
+
+            if unit in ["minute", "minutes", "min"]:
+                seconds = value * 60
+                unit = "minutes"
+            else:
+                seconds = value
+                unit = "seconds"
+
+            config = {}
+
+            if os.path.exists(self.config_path):
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+
+            config["prediction_interval_value"] = value
+            config["prediction_interval_unit"] = unit
+            config["prediction_interval_seconds"] = seconds
+            config["lastSaved"] = datetime.now().isoformat()
+
+            with open(self.config_path, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=2)
+
+            self.pr_time = seconds
+            self.last_prediction_interval_seconds = seconds
+
+            if self.camera_open and self.process == "prediction":
+                self.timer.start(seconds * 1000)
+                print(f"✅ Prediction timer updated immediately: {seconds} seconds")
+
+            return json.dumps({
+                "ok": True,
+                "message": f"Prediction timing saved: {value} {unit}",
+                "seconds": seconds
+            })
+
+        except Exception as e:
+            return json.dumps({
+                "ok": False,
+                "message": str(e)
+            })
+
     @pyqtSlot(str, result=str)
     def appendTraining(self, image_path):
         try:
@@ -385,6 +482,9 @@ class Bridge(QObject):
             self.timer.start(35)
         else:
             # Continue live updates
+            self.pr_time = self.get_prediction_interval_seconds()
+            self.last_prediction_interval_seconds = self.pr_time
+            print(f"⏱ Prediction interval: {self.pr_time} seconds")
             self.timer.start(self.pr_time * 1000)
 
         return "OK"
@@ -460,6 +560,7 @@ class Bridge(QObject):
             print("❌ save_session_txt error:", e)
 
     def count_show(self):
+        self.sync_prediction_interval_from_settings()
         job_id, _ = self.get_job_from_config()
 
         if job_id:
@@ -868,6 +969,80 @@ class Bridge(QObject):
             }
 
             return json.dumps(data)
+
+    @pyqtSlot(str, str, str, result=str)
+    def saveShift(self, shift_name, start_time, end_time):
+        try:
+            print("🔥 saveShift called")
+            print("shift_name =", shift_name)
+            print("start_time =", start_time)
+            print("end_time   =", end_time)
+
+            result = create_new_shift_version(
+                shift_name,
+                start_time,
+                end_time
+            )
+
+            print("✅ saveShift result =", result)
+
+            return json.dumps(result)
+
+        except Exception as e:
+            print("❌ saveShift error =", e)
+            return json.dumps({
+                "ok": False,
+                "message": str(e)
+            })
+
+
+    @pyqtSlot(result=str)
+    def getShifts(self):
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT 
+                    id,
+                    shift_name,
+                    start_time,
+                    end_time,
+                    active,
+                    created_at,
+                    updated_at
+                FROM SHIFT
+                ORDER BY active DESC, id DESC
+            """)
+
+            rows = cursor.fetchall()
+            conn.close()
+
+            shifts = []
+
+            for row in rows:
+                shifts.append({
+                    "id": row[0],
+                    "shift_name": row[1],
+                    "start_time": row[2],
+                    "end_time": row[3],
+                    "active": row[4],
+                    "created_at": row[5],
+                    "updated_at": row[6],
+                })
+    
+            return json.dumps({
+                "ok": True,
+                "shifts": shifts
+            })
+
+        except Exception as e:
+            return json.dumps({
+                "ok": False,
+                "shifts": [],
+                "message": str(e)
+            })
+
 
     def get_current_shift_name(self, cursor):
         try:

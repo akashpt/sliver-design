@@ -153,49 +153,228 @@ function downloadDefectImage() {
 }
 
 // ── Module: Settings ─────────────────────────────────────────────────
-function openSettings() {
-  document.getElementById("settingsModal").style.display = "flex";
-  document.getElementById("modeDefault").checked = true;
-  toggleManual();
-}
+// function openSettings() {
+//   document.getElementById("settingsModal").style.display = "flex";
+//   document.getElementById("modeDefault").checked = true;
+//   toggleManual();
+// }
 
-function closeSettings() {
-  document.getElementById("settingsModal").style.display = "none";
-}
+// function closeSettings() {
+//   document.getElementById("settingsModal").style.display = "none";
+// }
 
-function toggleManual() {
-  const isManual =
-    document.querySelector('input[name="mode"]:checked')?.value === "manual";
-  document.getElementById("manualControls").style.display = isManual
-    ? "block"
-    : "none";
-  document.getElementById("defaultInfo").style.display = isManual
-    ? "none"
-    : "block";
-}
+// function toggleManual() {
+//   const isManual =
+//     document.querySelector('input[name="mode"]:checked')?.value === "manual";
+//   document.getElementById("manualControls").style.display = isManual
+//     ? "block"
+//     : "none";
+//   document.getElementById("defaultInfo").style.display = isManual
+//     ? "none"
+//     : "block";
+// }
 
-function saveSettings() {
-  closeSettings();
-  showToast("Settings saved successfully");
-  addLog("Settings updated.");
-}
+// function saveSettings() {
+//   closeSettings();
+//   showToast("Settings saved successfully");
+//   addLog("Settings updated.");
+// }
 
-function switchTab(tabName) {
-  document
-    .querySelectorAll(".modal-tab")
-    .forEach((t) => t.classList.remove("active"));
-  document
-    .querySelectorAll(".tab-content")
-    .forEach((c) => c.classList.remove("active"));
-  if (tabName === "detection") {
-    document.querySelector(".modal-tab:first-child").classList.add("active");
-    document.getElementById("detectionTab").classList.add("active");
-  } else if (tabName === "threshold") {
-    document.querySelector(".modal-tab:last-child").classList.add("active");
-    document.getElementById("thresholdTab").classList.add("active");
-  }
-}
+// // function switchTab(tabName) {
+// //   document
+// //     .querySelectorAll(".modal-tab")
+// //     .forEach((t) => t.classList.remove("active"));
+// //   document
+// //     .querySelectorAll(".tab-content")
+// //     .forEach((c) => c.classList.remove("active"));
+// //   if (tabName === "detection") {
+// //     document.querySelector(".modal-tab:first-child").classList.add("active");
+// //     document.getElementById("detectionTab").classList.add("active");
+// //   } else if (tabName === "threshold") {
+// //     document.querySelector(".modal-tab:last-child").classList.add("active");
+// //     document.getElementById("thresholdTab").classList.add("active");
+// //   }
+// // }
+// function switchTab(tabName) {
+//   document
+//     .querySelectorAll(".modal-tab")
+//     .forEach((t) => t.classList.remove("active"));
 
+//   document
+//     .querySelectorAll(".tab-content")
+//     .forEach((c) => c.classList.remove("active"));
+
+//   if (tabName === "detection") {
+//     document.querySelectorAll(".modal-tab")[0].classList.add("active");
+//     document.getElementById("detectionTab").classList.add("active");
+//   }
+
+//   else if (tabName === "threshold") {
+//     document.querySelectorAll(".modal-tab")[1].classList.add("active");
+//     document.getElementById("thresholdTab").classList.add("active");
+//   }
+
+//   // else if (tabName === "shift") {
+//   //   document.querySelectorAll(".modal-tab")[2].classList.add("active");
+//   //   document.getElementById("shiftTab").classList.add("active");
+//   // }
+//   else if (tabName === "shift") {
+//   document.querySelectorAll(".modal-tab")[2].classList.add("active");
+//   document.getElementById("shiftTab").classList.add("active");
+
+//   loadShifts();
+//   }
+// }
+// function callBridgeSlot(slotName, ...args) {
+//   return new Promise((resolve) => {
+//     try {
+//       if (
+//         typeof window.bridge === "undefined" ||
+//         window.bridge === null ||
+//         typeof window.bridge[slotName] !== "function"
+//       ) {
+//         resolve({
+//           ok: false,
+//           message: "Bridge not available"
+//         });
+//         return;
+//       }
+
+//       window.bridge[slotName](...args, function (raw) {
+//         try {
+//           const res = typeof raw === "string" ? JSON.parse(raw) : raw;
+//           resolve(res);
+//         } catch (e) {
+//           resolve({
+//             ok: false,
+//             message: "Invalid response from bridge"
+//           });
+//         }
+//       });
+
+//     } catch (err) {
+//       resolve({
+//         ok: false,
+//         message: err.message
+//       });
+//     }
+//   });
+// }
+// async function loadShifts() {
+//   const tbody = document.getElementById("shiftTableBody");
+
+//   if (!tbody) {
+//     return;
+//   }
+
+//   tbody.innerHTML = `
+//     <tr>
+//       <td colspan="4">Loading shifts...</td>
+//     </tr>
+//   `;
+
+//   const res = await callBridgeSlot("getShifts");
+
+//   if (!res.ok) {
+//     tbody.innerHTML = `
+//       <tr>
+//         <td colspan="4">${res.message || "Failed to load shifts"}</td>
+//       </tr>
+//     `;
+//     return;
+//   }
+
+//   if (!res.shifts || res.shifts.length === 0) {
+//     tbody.innerHTML = `
+//       <tr>
+//         <td colspan="4">No shifts found</td>
+//       </tr>
+//     `;
+//     return;
+//   }
+
+//   tbody.innerHTML = "";
+
+//   res.shifts.forEach((shift) => {
+//     const isActive = Number(shift.active) === 1;
+
+//     const statusText = isActive ? "Active" : "Disabled";
+//     const statusClass = isActive
+//       ? "shift-status-active"
+//       : "shift-status-disabled";
+
+//     tbody.innerHTML += `
+//       <tr>
+//         <td>${shift.shift_name}</td>
+//         <td>${shift.start_time}</td>
+//         <td>${shift.end_time}</td>
+//         <td class="${statusClass}">${statusText}</td>
+//       </tr>
+//     `;
+//   });
+// }
+// async function saveShiftTiming() {
+//   const shiftNameEl = document.getElementById("shiftName");
+//   const shiftStartEl = document.getElementById("shiftStart");
+//   const shiftEndEl = document.getElementById("shiftEnd");
+
+//   const shiftName = (shiftNameEl?.value || "").trim();
+//   const startTime = (shiftStartEl?.value || "").trim();
+//   const endTime = (shiftEndEl?.value || "").trim();
+
+//   // Remove old red error border
+//   [shiftNameEl, shiftStartEl, shiftEndEl].forEach((el) => {
+//     if (el) el.classList.remove("input-error");
+//   });
+
+//   if (!shiftName) {
+//     shiftNameEl.classList.add("input-error");
+//     showToast("Shift name is required", 3000);
+//     shiftNameEl.focus();
+//     return;
+//   }
+
+//   if (!startTime) {
+//     shiftStartEl.classList.add("input-error");
+//     showToast("Start time is required", 3000);
+//     shiftStartEl.focus();
+//     return;
+//   }
+
+//   if (!endTime) {
+//     shiftEndEl.classList.add("input-error");
+//     showToast("End time is required", 3000);
+//     shiftEndEl.focus();
+//     return;
+//   }
+
+//   if (startTime === endTime) {
+//     shiftStartEl.classList.add("input-error");
+//     shiftEndEl.classList.add("input-error");
+//     showToast("Start time and end time cannot be same", 3500);
+//     return;
+//   }
+
+//   const res = await callBridgeSlot(
+//     "saveShift",
+//     shiftName,
+//     startTime,
+//     endTime
+//   );
+//   console.log("SHIFT SAVE RESPONSE =", res);
+
+//   if (res.ok) {
+//     showToast("✅ Shift saved successfully", 3000);
+
+//     shiftNameEl.value = "";
+//     shiftStartEl.value = "";
+//     shiftEndEl.value = "";
+
+//     loadShifts();
+//   } else {
+//     showToast("❌ " + (res.message || "Failed to save shift"), 4500);
+//   }
+// }
 // ── Module: Bridge Communication ─────────────────────────────────────
 const Bridge = (() => {
   const available = () =>

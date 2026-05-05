@@ -4,16 +4,16 @@ import sqlite3
 def get_connection():
     return sqlite3.connect(str(DB_FILE))
 
-def is_shift_time_overlapping(cursor, start_time, end_time, exclude_id=None):
-    if exclude_id:
+def is_shift_time_overlapping(cursor, start_time, end_time, exclude_shift_name=None):
+    if exclude_shift_name:
         cursor.execute("""
             SELECT id, shift_name
             FROM SHIFT
             WHERE active = 1
-            AND id != ?
+            AND LOWER(TRIM(shift_name)) != LOWER(TRIM(?))
             AND time(?) < time(end_time)
             AND time(?) > time(start_time)
-        """, (exclude_id, start_time, end_time))
+        """, (exclude_shift_name, start_time, end_time))
     else:
         cursor.execute("""
             SELECT id, shift_name
@@ -27,10 +27,46 @@ def is_shift_time_overlapping(cursor, start_time, end_time, exclude_id=None):
 
 def create_new_shift_version(shift_name, start_time, end_time):
     try:
+        shift_name = " ".join(str(shift_name).strip().split()).title()
+        start_time = str(start_time).strip()
+        end_time = str(end_time).strip()
+
+        if not shift_name:
+            return {
+                "ok": False,
+                "message": "Shift name is required"
+            }
+
+        if not start_time or not end_time:
+            return {
+                "ok": False,
+                "message": "Start time and end time are required"
+            }
+
+        # Convert 09:00 to 09:00:00
+        if len(start_time) == 5:
+            start_time = start_time + ":00"
+
+        if len(end_time) == 5:
+            end_time = end_time + ":00"
+
+        if start_time == end_time:
+            return {
+                "ok": False,
+                "message": "Start time and end time cannot be same"
+            }
+
         conn = get_connection()
         cursor = conn.cursor()
 
-        overlap = is_shift_time_overlapping(cursor, start_time, end_time)
+        # Check overlap with other active shifts only
+        # Same shift name old timing is ignored because it will be disabled
+        overlap = is_shift_time_overlapping(
+            cursor,
+            start_time,
+            end_time,
+            exclude_shift_name=shift_name
+        )
 
         if overlap:
             conn.close()
@@ -39,16 +75,16 @@ def create_new_shift_version(shift_name, start_time, end_time):
                 "message": f"Shift timing overlaps with active shift: {overlap[1]}"
             }
 
-        # old same shift_name rows inactive
+        # Disable old active same shift name
         cursor.execute("""
             UPDATE SHIFT
-            SET active = 0,
+            SET active = 0, 
                 updated_at = datetime('now', 'localtime')
-            WHERE shift_name = ?
+            WHERE LOWER(TRIM(shift_name)) = LOWER(TRIM(?))
             AND active = 1
         """, (shift_name,))
 
-        # insert new timing as active
+        # Insert new active shift timing
         cursor.execute("""
             INSERT INTO SHIFT (shift_name, start_time, end_time, active)
             VALUES (?, ?, ?, 1)
@@ -99,6 +135,7 @@ def init_db():
             shift_name TEXT NOT NULL,
             start_time TEXT NOT NULL,
             end_time TEXT NOT NULL,
+            active INTEGER DEFAULT 1,
             created_at TEXT DEFAULT (datetime('now', 'localtime')),
             updated_at TEXT DEFAULT (datetime('now', 'localtime'))
         )

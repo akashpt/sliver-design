@@ -1712,3 +1712,56 @@ input[type="range"] {
   object-fit: contain;
   display: block;
 }
+/* ===============================
+   Common Settings Modal Form
+   =============================== */
+
+.form-field {
+  margin-bottom: 1rem;
+}
+
+.form-field label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--gray-500, #6b7280);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.form-field input {
+  width: 100%;
+  padding: 10px 13px;
+  font-size: 0.95rem;
+  border: 1px solid rgba(90, 25, 31, 0.2);
+  border-radius: 8px;
+  background: #fefefe;
+  color: #1a1a1a;
+  box-sizing: border-box;
+}
+
+.form-field input:focus {
+  outline: none;
+  border-color: var(--primary, #5a191f);
+  box-shadow: 0 0 0 2px rgba(90, 25, 31, 0.12);
+}
+
+.shift-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.shift-table th,
+.shift-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(90, 25, 31, 0.12);
+  text-align: left;
+}
+
+.shift-table th {
+  font-weight: 700;
+  color: var(--primary, #5a191f);
+  background: rgba(90, 25, 31, 0.06);
+}

@@ -355,6 +355,227 @@
       </main>
     </div>
   </div>
+  <!-- SETTINGS MODAL -->
+<div id="settingsModal" class="modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <i class="fas fa-gear"></i>
+      <div class="modal-head-title">Detection Settings</div>
+    </div>
+
+    <div class="modal-body">
+      <div class="modal-tabs">
+        <button class="modal-tab" onclick="switchTab('detection')">
+          Detection Mode
+        </button>
+        <button class="modal-tab" onclick="switchTab('threshold')">
+          Threshold
+        </button>
+        <button class="modal-tab active" onclick="switchTab('shift')">
+          Shift Timing
+        </button>
+      </div>
+
+      <!-- Detection Mode Tab -->
+      <div id="detectionTab" class="tab-content">
+        <span class="sel-lbl" style="display: block; margin-bottom: 8px">
+          Detection Mode
+        </span>
+
+        <div class="mode-toggle">
+          <input
+            type="radio"
+            name="mode"
+            id="modeDefault"
+            value="default"
+            checked
+            onchange="toggleManual()"
+          />
+          <label for="modeDefault">Default</label>
+
+          <input
+            type="radio"
+            name="mode"
+            id="modeManual"
+            value="manual"
+            onchange="toggleManual()"
+          />
+          <label for="modeManual">Manual</label>
+        </div>
+
+        <div id="defaultInfo" style="margin: 12px 0 4px">
+          <input
+            type="text"
+            value="6.3.1"
+            readonly
+            style="
+              width: 100%;
+              padding: 11px 14px;
+              font-size: 0.95rem;
+              font-weight: 500;
+              border: 1px solid rgba(90, 25, 31, 0.25);
+              border-radius: 8px;
+              background: #fefefe;
+              color: var(--primary);
+              cursor: default;
+              box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.03);
+            "
+          />
+
+          <p
+            style="
+              font-size: 0.74rem;
+              color: var(--gray-500, #6b7280);
+              margin-top: 10px;
+              text-align: center;
+            "
+          >
+            Mode is locked to Default in current system configuration
+          </p>
+        </div>
+
+        <div id="manualControls" style="display: none">
+          <div class="slider-block">
+            <div class="slider-row">
+              <div class="slider-top">
+                <span class="slider-name">Exposure</span>
+                <input
+                  type="number"
+                  id="lowerValue"
+                  class="slider-num"
+                  value="35"
+                  min="0"
+                  max="100"
+                  oninput="document.getElementById('lowerSlider').value = this.value"
+                />
+              </div>
+
+              <input
+                type="range"
+                id="lowerSlider"
+                min="0"
+                max="100"
+                value="35"
+                oninput="document.getElementById('lowerValue').value = this.value"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Threshold Tab -->
+      <div id="thresholdTab" class="tab-content">
+        <span class="sel-lbl" style="display: block; margin-bottom: 8px">
+          Threshold Value
+        </span>
+
+        <input
+          type="number"
+          id="thresholdValue"
+          placeholder="Enter threshold value"
+          value="75"
+          min="0"
+          max="100"
+          style="
+            width: 100%;
+            padding: 11px 14px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            border: 1px solid rgba(90, 25, 31, 0.25);
+            border-radius: 8px;
+            background: #ffffff;
+            color: var(--primary);
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.03);
+          "
+        />
+
+        <p
+          style="
+            font-size: 0.74rem;
+            color: var(--gray-500, #6b7280);
+            margin-top: 10px;
+          "
+        >
+          Adjust threshold to control detection sensitivity. Higher values
+          require more confidence.
+        </p>
+      </div>
+
+      <!-- Shift Timing Tab -->
+      <div id="shiftTab" class="tab-content active">
+        <span class="sel-lbl" style="display: block; margin-bottom: 8px">
+          Create / Update Shift Timing
+        </span>
+
+        <div class="form-field">
+          <label for="shiftName">
+            Shift Name <span style="color: #ef233c">*</span>
+          </label>
+          <input
+            type="text"
+            id="shiftName"
+            placeholder="e.g. Shift 1"
+            autocomplete="off"
+          />
+        </div>
+
+        <div class="form-field">
+          <label for="shiftStart">
+            Start Time <span style="color: #ef233c">*</span>
+          </label>
+          <input type="time" id="shiftStart" />
+        </div>
+
+        <div class="form-field">
+          <label for="shiftEnd">
+            End Time <span style="color: #ef233c">*</span>
+          </label>
+          <input type="time" id="shiftEnd" />
+        </div>
+
+        <button
+          class="btn-m primary"
+          type="button"
+          onclick="saveShiftTiming()"
+          style="width: 100%; margin-top: 8px"
+        >
+          <i class="fas fa-save"></i> Save Shift
+        </button>
+
+        <div style="margin-top: 18px">
+          <span class="sel-lbl" style="display: block; margin-bottom: 8px">
+            Shift List
+          </span>
+
+          <div style="max-height: 220px; overflow-y: auto">
+            <table class="shift-table">
+              <thead>
+                <tr>
+                  <th>Shift</th>
+                  <th>Start</th>
+                  <th>End</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="shiftTableBody">
+                <tr>
+                  <td colspan="4">Loading shifts...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn-m ghost" onclick="closeSettings()">Cancel</button>
+      <button class="btn-m primary" onclick="saveSettings()">
+        Save Settings
+      </button>
+    </div>
+  </div>
+</div>
 
   <!-- TOAST -->
   <div class="toast" id="toast"></div>
@@ -373,6 +594,7 @@
     </div>
   </div>
   <script src="../static/script/controller.js"></script>
+  <script src="../static/script/settings_common.js"></script>
 </body>
 
 </html>

@@ -117,15 +117,21 @@
         <a href="index.html" class="nav-btn">
           <i class="fa-solid fa-gauge"></i> Dashboard
         </a>
-        <a href="report.html" class="nav-btn">
+        <!-- <a href="report.html" class="nav-btn">
           <i class="fas fa-file-lines"></i> Report
-        </a>
-        <button
+        </a> -->
+        <div class="nav-btn" onclick="bridge?.goReport()" id="menuReport">
+          <i class="fas fa-file-lines"></i> Report
+        </div>
+        <!-- <button
           class="nav-btn"
           onclick="showToast('Controller panel opening...', 3000)"
         >
           <i class="fas fa-sliders"></i> Controller
-        </button>
+        </button> -->
+        <a class="nav-btn" href="controller.html">
+          <i class="fas fa-sliders"></i> Controller
+        </a>
         <a href="training.html" class="nav-btn active">
           <i class="fas fa-graduation-cap"></i> Training
         </a>
@@ -468,6 +474,9 @@
             <button class="modal-tab" onclick="switchTab('threshold')">
               Threshold
             </button>
+            <button class="modal-tab" onclick="switchTab('shift')">
+              Shift Timing
+            </button>
           </div>
 
           <!-- Detection Mode Tab -->
@@ -591,6 +600,72 @@
               require more confidence.
             </p>
           </div>
+          <!-- Shift Timing Tab -->
+          <div id="shiftTab" class="tab-content">
+            <span class="sel-lbl" style="display: block; margin-bottom: 8px">
+              Create / Update Shift Timing
+            </span>
+
+            <div class="form-field">
+              <label for="shiftName">
+                Shift Name <span style="color: #ef233c">*</span>
+              </label>
+              <input
+                type="text"
+                id="shiftName"
+                placeholder="e.g. Shift 1"
+                autocomplete="off"
+              />
+            </div>
+
+            <div class="form-field">
+              <label for="shiftStart">
+                Start Time <span style="color: #ef233c">*</span>
+              </label>
+              <input type="time" id="shiftStart" />
+            </div>
+
+            <div class="form-field">
+              <label for="shiftEnd">
+                End Time <span style="color: #ef233c">*</span>
+              </label>
+              <input type="time" id="shiftEnd" />
+            </div>
+
+            <button
+              class="btn-m primary"
+              type="button"
+              onclick="saveShiftTiming()"
+              style="width: 100%; margin-top: 8px"
+            >
+              <i class="fas fa-save"></i> Save Shift
+            </button>
+
+            <div style="margin-top: 18px">
+              <span class="sel-lbl" style="display: block; margin-bottom: 8px">
+                Shift List
+              </span>
+
+              <div style="max-height: 220px; overflow-y: auto">
+                <table class="shift-table">
+                  <thead>
+                    <tr>
+                      <th>Shift</th>
+                      <th>Start</th>
+                      <th>End</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="shiftTableBody">
+                    <tr>
+                      <td colspan="4">Loading shifts...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          
         </div>
         <div class="modal-foot">
           <button class="btn-m ghost" onclick="closeSettings()">Cancel</button>
@@ -650,5 +725,6 @@
     </script>
     <!-- Script at bottom of body — DOM is fully parsed when it executes -->
     <script src="../static/script/traning.js"></script>
+    <script src="../static/script/settings_common.js"></script>
   </body>
 </html>
