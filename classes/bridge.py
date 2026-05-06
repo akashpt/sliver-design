@@ -226,9 +226,7 @@ class Bridge(QObject):
             print(f"❌ save_training_image error: {e}")
             return ""
 
-    # =========================================================
-    # TRAINED MODEL IMAGE MANAGEMENT
-    # =========================================================
+    #------------retrain methods-------------------
 
     IMAGE_EXTENSIONS = (".bmp", ".jpg", ".jpeg", ".png", ".tif", ".tiff")
 
@@ -239,20 +237,8 @@ class Bridge(QObject):
             for ch in job_id
         ).strip()
 
-    def training_folder_for_job(self, job_id):
-        safe_job_id = self.safe_job_name(job_id)
-        return TRAINING_IMAGES_DIR / safe_job_id
-
-    def model_folder_for_job(self, job_id):
-        safe_job_id = self.safe_job_name(job_id)
-        return MODELS_DIR / safe_job_id
-
     @pyqtSlot(result=str)
     def getTrainedModelList(self):
-        """
-        Dropdown model list.
-        Reads trained model folders from MODELS_DIR.
-        """
         try:
             jobs = self.get_model_job_ids()
 
@@ -262,7 +248,6 @@ class Bridge(QObject):
             })
 
         except Exception as e:
-            print("❌ getTrainedModelList error:", e)
             return json.dumps({
                 "ok": False,
                 "models": [],
@@ -270,140 +255,34 @@ class Bridge(QObject):
             })
 
     @pyqtSlot(str, result=str)
-    def getTrainingImagesByModel(self, job_id):
-        """
-        When dropdown model selected,
-        return training images from:
-        Sliver_Data/data/training_images/<job_id>/
-        """
+    def retrainSelectedModel(self, job_id):
         try:
             job_id = self.safe_job_name(job_id)
 
             if not job_id:
                 return json.dumps({
                     "ok": False,
-                    "images": [],
-                    "message": "Job ID is empty"
+                    "message": "Please select model"
                 })
 
-            training_folder = self.training_folder_for_job(job_id)
+            training_folder = TRAINING_IMAGES_DIR / job_id
+            model_folder = MODELS_DIR / job_id
 
             if not training_folder.exists():
                 return json.dumps({
                     "ok": False,
-                    "images": [],
-                    "message": "Training folder not found"
+                    "message": "Training images folder not found"
                 })
 
-            images = []
-
-            for file_path in sorted(training_folder.iterdir()):
-                if file_path.is_file() and file_path.suffix.lower() in self.IMAGE_EXTENSIONS:
-                    images.append({
-                        "file_name": file_path.name,
-                        "path": str(file_path),
-                        "src": str(file_path)
-                    })
-
-            return json.dumps({
-                "ok": True,
-                "job_id": job_id,
-                "count": len(images),
-                "images": images
-            })
-
-        except Exception as e:
-            print("❌ getTrainingImagesByModel error:", e)
-            return json.dumps({
-                "ok": False,
-                "images": [],
-                "message": str(e)
-            })
-
-    @pyqtSlot(str, str, result=str)
-    def deleteTrainingImage(self, job_id, file_name):
-        """
-        Delete selected image only from that job_id training folder.
-        UI must pass job_id and file_name.
-        """
-        try:
-            job_id = self.safe_job_name(job_id)
-            file_name = os.path.basename(str(file_name).strip())
-
-            if not job_id or not file_name:
-                return json.dumps({
-                    "ok": False,
-                    "message": "Job ID or file name missing"
-                })
-
-            training_folder = self.training_folder_for_job(job_id)
-            image_path = training_folder / file_name
-
-            if not image_path.exists():
-                return json.dumps({
-                    "ok": False,
-                    "message": "Image not found"
-                })
-
-            if image_path.suffix.lower() not in self.IMAGE_EXTENSIONS:
-                return json.dumps({
-                    "ok": False,
-                    "message": "Invalid image file"
-                })
-
-            image_path.unlink()
-
-            self.get_system_storage()
-
-            print("🗑 Training image deleted:", image_path)
-
-            return json.dumps({
-                "ok": True,
-                "message": "Image deleted",
-                "job_id": job_id,
-                "file_name": file_name
-            })
-
-        except Exception as e:
-            print("❌ deleteTrainingImage error:", e)
-            return json.dumps({
-                "ok": False,
-                "message": str(e)
-            })
-
-    @pyqtSlot(str, result=str)
-    def retrainModelWithRemainingImages(self, job_id):
-        """
-        Delete old model and create new model using remaining images.
-        Same model/job_id name is used.
-        """
-        try:
-            job_id = self.safe_job_name(job_id)
-
-            if not job_id:
-                return json.dumps({
-                    "ok": False,
-                    "message": "Job ID is empty"
-                })
-
-            training_folder = self.training_folder_for_job(job_id)
-            model_folder = self.model_folder_for_job(job_id)
-
-            if not training_folder.exists():
-                return json.dumps({
-                    "ok": False,
-                    "message": "Training folder not found"
-                })
-
-            remaining_images = [
+            images = [
                 p for p in training_folder.iterdir()
                 if p.is_file() and p.suffix.lower() in self.IMAGE_EXTENSIONS
             ]
 
-            if len(remaining_images) == 0:
+            if not images:
                 return json.dumps({
                     "ok": False,
-                    "message": "No training images remaining. Cannot retrain."
+                    "message": "No training images found for this model"
                 })
 
             backup_folder = None
@@ -411,7 +290,6 @@ class Bridge(QObject):
             if model_folder.exists():
                 backup_folder = MODELS_DIR / f"{job_id}_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
                 shutil.move(str(model_folder), str(backup_folder))
-                print("📦 Old model moved to backup:", backup_folder)
 
             trainer = StripColorTraining()
             result = trainer.train(str(training_folder), job_id)
@@ -426,10 +304,9 @@ class Bridge(QObject):
                     "ok": True,
                     "message": "Model retrained successfully",
                     "job_id": job_id,
-                    "image_count": len(remaining_images)
+                    "image_count": len(images)
                 })
 
-            # Restore old model if retraining failed
             if backup_folder and backup_folder.exists():
                 if model_folder.exists():
                     shutil.rmtree(str(model_folder), ignore_errors=True)
@@ -441,12 +318,12 @@ class Bridge(QObject):
             })
 
         except Exception as e:
-            print("❌ retrainModelWithRemainingImages error:", e)
             return json.dumps({
                 "ok": False,
                 "message": str(e)
             })
-
+    #----------------------------------------------------------
+    
     def get_saved_exposure(self):
         exposure = 30000
 

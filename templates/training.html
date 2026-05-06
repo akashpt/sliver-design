@@ -372,6 +372,35 @@
               </div>
             </div>
           </div>
+          <div class="divider mtb-3"></div>/------retrain section----------------
+
+          <div class="control-group">
+            <div class="ctrl-mode-label">
+              <i class="fas fa-sync-alt" style="color: var(--primary)"></i>
+              Retrain Model
+            </div>
+
+            <select
+              id="retrainModelSelect"
+              style="
+                width:100%;
+                padding:10px;
+                border-radius:8px;
+                border:1px solid #ccc;
+                margin-top:8px;
+              "
+            >
+              <option value="">Select trained model</option>
+            </select>
+
+            <button
+              class="btn-m primary"
+              style="width:100%; margin-top:10px;"
+              onclick="retrainSelectedModel()"
+            >
+              <i class="fas fa-rotate"></i> Retrain
+            </button>
+          </div>/-------------retrain section----------------
         </div>
       </aside>
     </div>

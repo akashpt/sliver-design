@@ -1127,3 +1127,74 @@ document.addEventListener("DOMContentLoaded", () => {
   // Count
   restrictInput(document.getElementById("tsColor"), /[^a-zA-Z0-9_]/g);
 });
+function callBridge(slotName, ...args) {
+  return new Promise((resolve) => {
+    try {
+      if (!window.bridge || typeof window.bridge[slotName] !== "function") {
+        resolve({ ok: false, message: "Bridge not available" });
+        return;
+      }
+
+      window.bridge[slotName](...args, function (raw) {
+        try {
+          resolve(typeof raw === "string" ? JSON.parse(raw) : raw);
+        } catch (e) {
+          resolve({ ok: false, message: "Invalid bridge response" });
+        }
+      });
+    } catch (err) {
+      resolve({ ok: false, message: err.message });
+    }
+  });
+}
+
+async function loadRetrainModelDropdown() {
+  const select = document.getElementById("retrainModelSelect");
+  if (!select) return;
+
+  select.innerHTML = `<option value="">Loading models...</option>`;
+
+  const res = await callBridge("getTrainedModelList");
+
+  select.innerHTML = `<option value="">Select trained model</option>`;
+
+  if (!res.ok || !res.models || res.models.length === 0) {
+    select.innerHTML = `<option value="">No trained models found</option>`;
+    return;
+  }
+
+  res.models.forEach((modelName) => {
+    const option = document.createElement("option");
+    option.value = modelName;
+    option.textContent = modelName;
+    select.appendChild(option);
+  });
+}
+
+async function retrainSelectedModel() {
+  const select = document.getElementById("retrainModelSelect");
+  const jobId = select?.value || "";
+
+  if (!jobId) {
+    showToast("Please select a model", 3000);
+    return;
+  }
+
+  showLoader("Retraining model...");
+
+  const res = await callBridge("retrainSelectedModel", jobId);
+
+  hideLoader();
+
+  if (res.ok) {
+    showToast("✅ Model retrained successfully", 4000);
+    addLog(`✅ Retrained model: ${jobId}`);
+  } else {
+    showToast("❌ " + (res.message || "Retraining failed"), 5000);
+    addLog("❌ Retraining failed: " + (res.message || "Unknown error"));
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  setTimeout(loadRetrainModelDropdown, 500);
+});
