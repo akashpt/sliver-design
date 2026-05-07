@@ -7,5 +7,5 @@
   "min_exposure": 31,
   "max_exposure": 4063201,
   "prediction_interval_seconds": 1,
-  "background_threshold": 1
+  "background_threshold": 45
 }
