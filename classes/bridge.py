@@ -481,6 +481,29 @@ class Bridge(QObject):
                     "message": "Cannot read selected image"
                 })
 
+
+            predictor = StripColorPrediction()
+
+            strips = predictor.detect_horizontal_strips(img)
+
+            found_strip_count = len(strips)
+            expected_strip_count = predictor.expected_strip_count
+
+            if found_strip_count != expected_strip_count:
+
+                message = (
+                    f"Expected strip = {expected_strip_count}, "
+                    f"but it has ({found_strip_count}), cannot be append"
+                )
+
+                print("❌", message)
+
+                return json.dumps({
+                    "ok": False,
+                    "message": message
+                })
+
+
             # Save into training folder
             saved_path = self.save_training_image(img, job_id)
 

@@ -3,7 +3,7 @@ import numpy as np
 import json
 from pathlib import Path
 
-from path import MODELS_DIR
+from path import MODELS_DIR, SETTINGS_FILE
 
 # raw_img is an optional output (defect raw frame without annotation).
 # If not used, it can be removed — but ensure all return formats
@@ -35,6 +35,25 @@ class StripColorPrediction:
                 return json.load(f)
         except Exception as e:
             print("Load Model Error :",e)
+
+
+    def get_background_threshold(self):
+        try:
+            default_value = 45
+
+            if not SETTINGS_FILE.exists():
+                return default_value
+
+            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                config = json.load(f)
+
+            value = int(config.get("background_threshold", default_value))
+
+            return value
+
+        except Exception as e:
+            print("Background Threshold Error :", e)
+            return 45
 
     # ---------------- DETECT STRIPS ----------------
 
@@ -166,7 +185,11 @@ class StripColorPrediction:
             gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
 
             # dark pixels = background
-            bg_mask = gray_roi < 45
+            bg_threshold = self.get_background_threshold()
+
+            bg_mask = gray_roi < bg_threshold
+
+            print("Background Threshold =", bg_threshold)
 
             # find background contours - Find Connected Background Regions
             contours, _ = cv2.findContours(
