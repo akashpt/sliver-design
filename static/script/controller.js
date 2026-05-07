@@ -111,8 +111,6 @@ let _mode = null;
 async function applyExposure() {
   const inp = document.getElementById("exposureInput");
   const rawVal = inp.value.trim();
-  // console.log("🔥 Apply Exposure clicked:", rawVal);
-  // alert("Apply Exposure clicked: " + rawVal);
 
   /* ── Empty input guard ── */
   if (rawVal === "") {
@@ -155,7 +153,6 @@ async function applyExposure() {
       showError("Exposure error: " + (p.message || "Unknown"));
       return;
     }
-    // showToast("Exposure applied ✓", "ok");
 
     /* ── Confirm running value from backend ── */
     try {
@@ -169,7 +166,6 @@ async function applyExposure() {
       }
       if (val !== null && !isNaN(val)) {
         document.getElementById("exposureInput").value = Math.round(val);
-        // showToast("Running: " + val + " µs", "ok");
       }
     } catch (_) {
       /* getExposure confirmation is optional */
@@ -252,7 +248,7 @@ async function checkConnection() {
 }
 
 /* ════════════════════════════════════════════
-       ③ MODE — read-only display, driven by backend
+       ③ MODE — display driven by backend
    ════════════════════════════════════════════ */
 function resetMode() {
   document.getElementById("btnAuto").dataset.active = "false";
@@ -267,9 +263,7 @@ function updateModeDisplay(mode) {
   const isAuto = mode === "auto";
   document.getElementById("modeSeg").dataset.mode = mode;
   document.getElementById("btnAuto").dataset.active = isAuto ? "true" : "false";
-  document.getElementById("btnManual").dataset.active = !isAuto
-    ? "true"
-    : "false";
+  document.getElementById("btnManual").dataset.active = !isAuto ? "true" : "false";
   const pill = document.getElementById("modeStatusPill");
   pill.textContent = isAuto ? "AUTO" : "MANUAL";
   pill.className = "mode-status-pill " + (isAuto ? "pill-auto" : "pill-manual");
@@ -278,7 +272,6 @@ function updateModeDisplay(mode) {
   const grid = document.querySelector(".io-grid");
   if (grid) grid.classList.toggle("io-grid--disabled", isAuto);
   if (isAuto) {
-    /* Reset all IO visually to OFF when switching to auto */
     Object.keys(IO_CFG).forEach((dev) => setIO(dev, false));
   }
 }
@@ -287,32 +280,12 @@ function updateModeDisplay(mode) {
        ④ I/O TOGGLES — visual state management
    ════════════════════════════════════════════ */
 const IO_CFG = {
-  gripper: {
-    toggleId: "gripperToggle",
-    labelId: "gripperLabel",
-    cardId: "gripperCard",
-  },
-  uv: { toggleId: "uvToggle", labelId: "uvLabel", cardId: "uvCard" },
-  relay1: {
-    toggleId: "relay1Toggle",
-    labelId: "relay1Label",
-    cardId: "relay1Card",
-  },
-  relay2: {
-    toggleId: "relay2Toggle",
-    labelId: "relay2Label",
-    cardId: "relay2Card",
-  },
-  conveyor: {
-    toggleId: "conveyorToggle",
-    labelId: "conveyorLabel",
-    cardId: "conveyorCard",
-  },
-  sensor: {
-    toggleId: "sensorToggle",
-    labelId: "sensorLabel",
-    cardId: "sensorCard",
-  },
+  gripper:  { toggleId: "gripperToggle",  labelId: "gripperLabel",  cardId: "gripperCard"  },
+  uv:       { toggleId: "uvToggle",       labelId: "uvLabel",       cardId: "uvCard"       },
+  relay1:   { toggleId: "relay1Toggle",   labelId: "relay1Label",   cardId: "relay1Card"   },
+  relay2:   { toggleId: "relay2Toggle",   labelId: "relay2Label",   cardId: "relay2Card"   },
+  conveyor: { toggleId: "conveyorToggle", labelId: "conveyorLabel", cardId: "conveyorCard" },
+  sensor:   { toggleId: "sensorToggle",   labelId: "sensorLabel",   cardId: "sensorCard"   },
 };
 
 function setIO(device, on) {
@@ -349,21 +322,11 @@ async function loadExposureRange() {
     const minVal = parseFloat(p.min);
     const maxVal = parseFloat(p.max);
 
-    /* ── Min and Max must both be > 0 ── */
-    // if (!minVal || minVal <= 0 || !maxVal || maxVal <= 0) {
-    //   showError(
-    //     "Invalid camera exposure range: Min and Max must both be greater than 0. " +
-    //       "Please check Live camera ",
-    //   );
-    //   return;
-    // }
-
     const inp = document.getElementById("exposureInput");
     inp.min = Math.round(minVal);
     inp.max = Math.round(maxVal);
     inp.step = 1;
 
-    /* Update the hint line to show the real range */
     const hint = document.querySelector(".ctrl-hint");
     if (hint) {
       hint.innerHTML =
@@ -383,7 +346,6 @@ async function loadExposureRange() {
        ⑥ FETCH LIVE STATE FROM BACKEND
    ════════════════════════════════════════════ */
 async function fetchCurrentState() {
-  /* ── Camera exposure range (min/max from settings.json) ── */
   await loadExposureRange();
 
   /* ── Current exposure value ── */
@@ -417,7 +379,7 @@ async function fetchCurrentState() {
     console.warn("getControllerMode failed", e);
   }
 
-  /* ── I/O states (only relevant in manual mode) ── */
+  /* ── I/O states (manual mode only) ── */
   if (_mode === "manual") {
     try {
       const raw = await callWithResult("cameraControl", "getIOStates", "");
@@ -435,29 +397,141 @@ async function fetchCurrentState() {
 }
 
 /* ════════════════════════════════════════════
-       ⑦ WIRE ALL EVENTS
+       ⑦ SIGNAL STATUS — left card
+          Read-only. Updated ONLY by
+          signal_status_signal from Python.
+          JS has zero signal logic — pure display.
+   ════════════════════════════════════════════ */
+
+/* Left card badge + card element IDs */
+const STATUS_CFG = {
+  signal1: { badgeId: "signal1Badge", cardId: "signal1Card" },
+  signal2: { badgeId: "signal2Badge", cardId: "signal2Card" },
+  signal3: { badgeId: "signal3Badge", cardId: "signal3Card" },
+  signal4: { badgeId: "signal4Badge", cardId: "signal4Card" },
+  signal5: { badgeId: "signal5Badge", cardId: "signal5Card" },
+  signal6: { badgeId: "signal6Badge", cardId: "signal6Card" },
+  signal7: { badgeId: "signal7Badge", cardId: "signal7Card" },
+};
+
+/*
+ * setSignalStatus — updates LEFT card badge only.
+ * Never touches the right-card (Signal Controls) toggles.
+ */
+function setSignalStatus(signal, on) {
+  const cfg = STATUS_CFG[signal];
+  if (!cfg) return;
+  const badge = document.getElementById(cfg.badgeId);
+  const card  = document.getElementById(cfg.cardId);
+  if (badge) {
+    badge.textContent = on ? "ON" : "OFF";
+    badge.className   = "signal-badge " + (on ? "on" : "off");
+  }
+  if (card) card.dataset.on = on ? "true" : "false";
+}
+
+function applySignalStatus(data) {
+  setSignalStatus("signal1", !!data.signal1);
+  setSignalStatus("signal2", !!data.signal2);
+  setSignalStatus("signal3", !!data.signal3);
+  setSignalStatus("signal4", !!data.signal4);
+  setSignalStatus("signal5", !!data.signal5);
+  setSignalStatus("signal6", !!data.signal6);
+  setSignalStatus("signal7", !!data.signal7);
+}
+
+async function loadSignalStatus() {
+  try {
+    const raw = await callWithResult("cameraControl", "getSignalStatus", "");
+    let data = {};
+    try { data = JSON.parse(raw); } catch (_) {}
+    applySignalStatus(data);
+  } catch (e) {
+    console.warn("getSignalStatus failed", e);
+  }
+}
+
+/* ════════════════════════════════════════════
+       ⑧ SIGNAL CONTROLS — right card
+          Write-only toggles.
+          User toggles → cameraControl → hardware.
+          Left-card Signal Status is NEVER touched.
+   ════════════════════════════════════════════ */
+
+/* Right card toggle IDs — for page-load reset only */
+const SIGNAL_CFG = {
+  whitelight:   { toggleId: "whitelightToggle"  },
+  uvlight:      { toggleId: "uvlightToggle"      },
+  machinebreak: { toggleId: "machinebreakToggle" },
+  greenlight:   { toggleId: "greenlightToggle"   },
+  yellowlight:  { toggleId: "yellowlightToggle"  },
+  redlight:     { toggleId: "redlightToggle"     },
+  empty:        { toggleId: "emptyToggle"        },
+};
+
+/* Reset a right-card toggle visually — never affects left card */
+function setSignal(signal, on) {
+  const cfg = SIGNAL_CFG[signal];
+  if (!cfg) return;
+  const toggle = document.getElementById(cfg.toggleId);
+  const sw     = toggle ? toggle.closest(".sw") : null;
+  if (toggle) toggle.checked = on;
+  if (sw) on ? sw.classList.add("on") : sw.classList.remove("on");
+}
+
+/* ════════════════════════════════════════════
+       ⑨ BRIDGE → SIGNAL STATUS (left card)
+          Listens ONLY to signal_status_signal.
+          Python owns all signal ON/OFF logic.
+          JS receives flat true/false per signal
+          and renders it — nothing more.
+   ════════════════════════════════════════════ */
+function connectSignalStatusToBridge(bridge) {
+
+  /*
+   * signal_status_signal — dedicated pyqtSignal from bridge.py.
+   *
+   * Payload (JSON string):
+   * {
+   *   "signal1": true | false,
+   *   "signal2": true | false,
+   *   "signal3": true | false,
+   *   "signal4": true | false,
+   *   "signal5": true | false,
+   *   "signal6": true | false,
+   *   "signal7": true | false
+   * }
+   *
+   * Python decides when each signal is ON or OFF
+   * (based on counts, defects, resets, timing, etc.).
+   * JS just receives and displays.
+   */
+  bridge.signal_status_signal.connect(function (jsonStr) {
+    var data = {};
+    try { data = JSON.parse(jsonStr); } catch (_) {}
+    applySignalStatus(data);
+  });
+
+  console.log("✅ Signal Status card connected to signal_status_signal");
+}
+
+/* ════════════════════════════════════════════
+       DOMContentLoaded — wire up all UI events
    ════════════════════════════════════════════ */
 document.addEventListener("DOMContentLoaded", function () {
+
   /* ── Apply exposure button ── */
   document
     .getElementById("ctrlApplyBtn")
     .addEventListener("click", applyExposure);
 
-  /* ── Exposure input: integers only, block all special chars ── */
+  /* ── Exposure input: integers only, block special chars ── */
   var expInp = document.getElementById("exposureInput");
   expInp.addEventListener("keydown", function (e) {
     var allowed = [
-      "Backspace",
-      "Delete",
-      "Tab",
-      "Escape",
-      "Enter",
-      "ArrowLeft",
-      "ArrowRight",
-      "ArrowUp",
-      "ArrowDown",
-      "Home",
-      "End",
+      "Backspace", "Delete", "Tab", "Escape", "Enter",
+      "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+      "Home", "End",
     ];
     if (allowed.indexOf(e.key) !== -1) return;
     if (
@@ -478,15 +552,13 @@ document.addEventListener("DOMContentLoaded", function () {
     if (e.target === this) closeError();
   });
 
-  /* ── Mode buttons → unified cameraControl slot ── */
+  /* ── Mode buttons → cameraControl slot ── */
   document.getElementById("btnAuto").addEventListener("click", function () {
     if (_mode === "auto") return;
     callWithResult("cameraControl", "setMode", "auto")
       .then(function (raw) {
         let p = {};
-        try {
-          p = JSON.parse(raw);
-        } catch (_) {}
+        try { p = JSON.parse(raw); } catch (_) {}
         if (p.ok === false) {
           showError("Mode error: " + (p.message || "Unknown"));
           return;
@@ -504,9 +576,7 @@ document.addEventListener("DOMContentLoaded", function () {
     callWithResult("cameraControl", "setMode", "manual")
       .then(function (raw) {
         let p = {};
-        try {
-          p = JSON.parse(raw);
-        } catch (_) {}
+        try { p = JSON.parse(raw); } catch (_) {}
         if (p.ok === false) {
           showError("Mode error: " + (p.message || "Unknown"));
           return;
@@ -519,40 +589,36 @@ document.addEventListener("DOMContentLoaded", function () {
       });
   });
 
-  /* ── IO toggles → unified cameraControl slot ──
-       data-fn on each checkbox matches the param name exactly:
-       setGripper | setUVLight | setRelay1 | setRelay2 | setConveyor | setSensorLight
+  /* ── IO toggles → cameraControl slot ──
+       data-fn: setGripper | setUVLight | setRelay1 | setRelay2 | setConveyor | setSensorLight
   ── */
   document
     .querySelectorAll(".io-grid input[type='checkbox'][data-fn]")
     .forEach(function (chk) {
       chk.addEventListener("change", function () {
-        var param = chk.dataset.fn; // e.g. "setGripper"
-        var dev = chk.dataset.device; // e.g. "gripper"
-        var on = chk.checked;
+        var param = chk.dataset.fn;     // e.g. "setGripper"
+        var dev   = chk.dataset.device; // e.g. "gripper"
+        var on    = chk.checked;
         setIO(dev, on); // instant visual feedback
         callWithResult("cameraControl", param, String(on))
           .then(function (raw) {
             var p = {};
-            try {
-              p = JSON.parse(raw);
-            } catch (_) {}
+            try { p = JSON.parse(raw); } catch (_) {}
             if (p.ok === false) {
               setIO(dev, !on); // revert on error
               showError(param + " failed: " + (p.message || "Unknown"));
             }
           })
           .catch(function (e) {
-            setIO(dev, !on); // revert on bridge error
+            setIO(dev, !on);
             showError(param + " error: " + e.message);
           });
       });
     });
 
-  /* ── Click anywhere on io-box to toggle the device ── */
+  /* ── Click anywhere on io-box to toggle ── */
   document.querySelectorAll(".io-box").forEach(function (box) {
     box.addEventListener("click", function (e) {
-      /* If click was inside .sw label, browser already toggled — don't double-fire */
       if (e.target.closest(".sw")) return;
       var chk = box.querySelector("input[type='checkbox']");
       if (!chk) return;
@@ -561,26 +627,63 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   });
 
-  /* ── Hard-reset all IO to OFF on every page load ──
-     WebEngine caches checkbox state across reloads;
-     this ensures UI reflects the real (off) state
-     until the bridge reports otherwise. */
+  /* ── Hard-reset all IO to OFF on page load ── */
   Object.keys(IO_CFG).forEach(function (dev) {
     setIO(dev, false);
   });
 
-  /* ── Load exposure first ── */
+  /* ── Hard-reset right-card (Signal Controls) toggles to OFF on page load ── */
+  Object.keys(SIGNAL_CFG).forEach(function (sig) {
+    setSignal(sig, false);
+  });
+
+  /* ── Signal Controls (right card) → bridge write ──
+       User toggles → cameraControl → hardware.
+       On error: revert only that toggle.
+       Left-card Signal Status is NEVER touched here.
+  ── */
+  document
+    .querySelectorAll("#signalControlCard input[type='checkbox'][data-fn]")
+    .forEach(function (chk) {
+      chk.addEventListener("change", function () {
+        var param = chk.dataset.fn; // e.g. "setWhiteLight"
+        var on    = chk.checked;
+        var sw    = chk.closest(".sw");
+
+        /* Instant visual feedback */
+        if (sw) on ? sw.classList.add("on") : sw.classList.remove("on");
+
+        callWithResult("cameraControl", param, String(on))
+          .then(function (raw) {
+            var p = {};
+            try { p = JSON.parse(raw); } catch (_) {}
+            if (p.ok === false) {
+              /* Revert toggle only — left card untouched */
+              chk.checked = !on;
+              if (sw) on ? sw.classList.remove("on") : sw.classList.add("on");
+              showError(param + " failed: " + (p.message || "Unknown"));
+            }
+          })
+          .catch(function (e) {
+            /* Revert toggle on bridge error — left card untouched */
+            chk.checked = !on;
+            if (sw) on ? sw.classList.remove("on") : sw.classList.add("on");
+            showError(param + " error: " + e.message);
+          });
+      });
+    });
+
+  /* ── Load exposure range + current value ── */
   loadExposureRange();
   callWithResult("cameraControl", "getExposure", "")
     .then(function (raw) {
-      let val = null; 
+      let val = null;
       try {
         const p = JSON.parse(raw);
         val = p.value ?? p.exposure ?? null;
       } catch (_) {
         val = parseFloat(raw);
       }
-
       if (val !== null && !isNaN(val)) {
         document.getElementById("exposureInput").value = Math.round(val);
       }
@@ -591,4 +694,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
   /* ── Auto-check connection on page load ── */
   checkConnection();
+
+  /* ── Subscribe Signal Status left card to bridge signal_status_signal ── */
+  initBridge()
+    .then(function (bridge) {
+      connectSignalStatusToBridge(bridge);
+      loadSignalStatus();
+    })
+    .catch(function (e) {
+      console.warn("Bridge signal subscription failed:", e);
+    });
 });

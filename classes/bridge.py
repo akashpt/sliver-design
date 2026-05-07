@@ -25,6 +25,7 @@ class Bridge(QObject):
     counts_signal = pyqtSignal(str)
     storage_signal = pyqtSignal(str)  
     defect_signal = pyqtSignal(str)   
+    signal_status_signal = pyqtSignal(str)
 
     def __init__(self, app_ref):
         super().__init__()
@@ -72,6 +73,16 @@ class Bridge(QObject):
         self.inspected = 0
         self.good = 0
         self.bad = 0
+        self.current_signal_status = {
+            "signal1": True,
+            "signal2": True,
+            "signal3": False,
+            "signal4": False,
+            "signal5": False,
+            "signal6": False,
+            "signal7": False,
+        }
+        self.save_signal_status_to_settings(self.current_signal_status)
 
         # Config file path
         # config_dir = QStandardPaths.writableLocation(QStandardPaths.AppConfigLocation)
@@ -170,7 +181,9 @@ class Bridge(QObject):
                 "bad": 0,
                 "status": "reset"
             }))
-
+            
+            self.emit_signal_status()
+            
             print("Config reset successfully")
 
         except Exception as e:
@@ -596,8 +609,8 @@ class Bridge(QObject):
 
         self.camera_open = True
 
-        # # Grab one frame immediately so current_frame is ready
-        # self.grab_frame()
+        # ── Signal Status: camera started → signal1 ON ──
+        self.emit_signal_status(signal1=True)
         if process == "live_stream":
             self.timer.start(35)
         else:
@@ -647,7 +660,9 @@ class Bridge(QObject):
         turn_off_greenlight()
         # turn_off_redlight()
         turn_off_whitelight()
-        # self.insert_report()
+
+        # ── Signal Status: camera stopped → all signals OFF ──
+        self.emit_signal_status()
 
         self.session_end_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
         if self.process == "prediction":
@@ -995,10 +1010,6 @@ class Bridge(QObject):
     
     def emit_defect_payload(self, status, file_path, raw_path):
         try:
-            # turn_off_greenlight()
-            # turn_on_redlight()
-            # print("🔴 Defect popup showing: Green OFF, Red ON")
-
             defect_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
             payload = {
@@ -1011,8 +1022,79 @@ class Bridge(QObject):
 
             self.defect_signal.emit(json.dumps(payload))
 
+            # ── Signal Status: defect → signal6 ON, signal4 OFF, signal1 OFF
+            #    signal3 only if strip missing
+            is_missing = (status == "strip missing")
+            self.emit_signal_status(
+                signal1=False,
+                signal6=True,
+                signal4=False,
+                signal3=is_missing,
+            )
+
         except Exception as e:
             print("❌ emit_defect_payload error:", e)
+
+    def emit_signal_status(self, **kwargs):
+        """
+        Emit the current ON/OFF state for all 7 signals to the JS left card.
+        Only the keys passed will be True; everything else defaults to False.
+
+        Usage examples:
+            self.emit_signal_status(signal1=True, signal4=True)
+            self.emit_signal_status()   # all OFF
+        """
+        payload = {
+            "signal1": False,
+            "signal2": False,
+            "signal3": False,
+            "signal4": False,
+            "signal5": False,
+            "signal6": False,
+            "signal7": False,
+        }
+        payload.update(kwargs)
+        self.current_signal_status = payload
+        self.save_signal_status_to_settings(payload)
+        self.signal_status_signal.emit(json.dumps(payload))
+
+    def save_signal_status_to_settings(self, payload):
+        try:
+            config = {}
+            if os.path.exists(self.config_path):
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+
+            signal_status = {
+                "signal1": bool(payload.get("signal1", False)),
+                "signal2": bool(payload.get("signal2", False)),
+                "signal3": bool(payload.get("signal3", False)),
+                "signal4": bool(payload.get("signal4", False)),
+                "signal5": bool(payload.get("signal5", False)),
+                "signal6": bool(payload.get("signal6", False)),
+                "signal7": bool(payload.get("signal7", False)),
+            }
+
+            has_legacy_status = (
+                "signal_status" in config or
+                "signal_status_lastSaved" in config
+            )
+            if config.get("Signal Status") == signal_status and not has_legacy_status:
+                return
+
+            config.pop("signal_status", None)
+            config.pop("signal_status_lastSaved", None)
+            config["Signal Status"] = signal_status
+            config["Signal Status Last Saved"] = datetime.now().isoformat()
+
+            Path(self.config_path).parent.mkdir(parents=True, exist_ok=True)
+            with open(self.config_path, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+
+        except Exception as e:
+            print("❌ save_signal_status_to_settings error:", e)
 
     def get_model_job_ids(self):
         try:
@@ -1806,7 +1888,123 @@ class Bridge(QObject):
                     "ok": True,
                     "value": exposure
                 })
-    
+
+            # ── Controller mode ────────────────────────────────────────────
+            if action == "setMode":
+                mode = value.strip().lower()   # "auto" | "manual"
+                if mode not in ("auto", "manual"):
+                    return json.dumps({"ok": False, "message": "Invalid mode"})
+                config = {}
+                if os.path.exists(self.config_path):
+                    with open(self.config_path, "r", encoding="utf-8") as f:
+                        config = json.load(f)
+                config["controller_mode"] = mode
+                with open(self.config_path, "w", encoding="utf-8") as f:
+                    json.dump(config, f, indent=2)
+                return json.dumps({"ok": True, "mode": mode})
+
+            if action == "getControllerMode":
+                config = {}
+                if os.path.exists(self.config_path):
+                    with open(self.config_path, "r", encoding="utf-8") as f:
+                        config = json.load(f)
+                return json.dumps({"ok": True, "mode": config.get("controller_mode", "auto")})
+
+            # ── I/O states (manual mode) ───────────────────────────────────
+            if action == "getIOStates":
+                config = {}
+                if os.path.exists(self.config_path):
+                    with open(self.config_path, "r", encoding="utf-8") as f:
+                        config = json.load(f)
+                io = config.get("io_states", {})
+                return json.dumps({
+                    "ok": True,
+                    "gripper":  bool(io.get("gripper",  False)),
+                    "uv":       bool(io.get("uv",       False)),
+                    "relay1":   bool(io.get("relay1",   False)),
+                    "relay2":   bool(io.get("relay2",   False)),
+                    "conveyor": bool(io.get("conveyor", False)),
+                    "sensor":   bool(io.get("sensor",   False)),
+                })
+
+            if action == "getSignalStatus":
+                config = {}
+                if os.path.exists(self.config_path):
+                    with open(self.config_path, "r", encoding="utf-8") as f:
+                        config = json.load(f)
+                status = config.get("Signal Status", {})
+                return json.dumps({
+                    "ok": True,
+                    "signal1": bool(status.get("signal1", False)),
+                    "signal2": bool(status.get("signal2", False)),
+                    "signal3": bool(status.get("signal3", False)),
+                    "signal4": bool(status.get("signal4", False)),
+                    "signal5": bool(status.get("signal5", False)),
+                    "signal6": bool(status.get("signal6", False)),
+                    "signal7": bool(status.get("signal7", False)),
+                })
+
+            if action in ("setGripper", "setUVLight", "setRelay1",
+                          "setRelay2", "setConveyor", "setSensorLight"):
+                on = value.strip().lower() == "true"
+                key_map = {
+                    "setGripper":     "gripper",
+                    "setUVLight":     "uv",
+                    "setRelay1":      "relay1",
+                    "setRelay2":      "relay2",
+                    "setConveyor":    "conveyor",
+                    "setSensorLight": "sensor",
+                }
+                dev_key = key_map[action]
+                config = {}
+                if os.path.exists(self.config_path):
+                    with open(self.config_path, "r", encoding="utf-8") as f:
+                        config = json.load(f)
+                io = config.get("io_states", {})
+                io[dev_key] = on
+                config["io_states"] = io
+                with open(self.config_path, "w", encoding="utf-8") as f:
+                    json.dump(config, f, indent=2)
+                print(f"✅ IO {action} → {on}")
+                return json.dumps({"ok": True, "device": dev_key, "value": on})
+
+            # ── Signal Controls (write-only from JS right card) ────────────
+            # Each action writes the signal state to hardware / config.
+            # The Signal Status left card is driven purely by bridge signals
+            # (counts_signal, defect_signal) and is never touched here.
+            SIGNAL_ACTION_MAP = {
+                "setWhiteLight":   "whitelight",
+                "setUVLight2":     "uvlight",
+                "setMachineBreak": "machinebreak",
+                "setGreenLight":   "greenlight",
+                "setYellowLight":  "yellowlight",
+                "setRedLight":     "redlight",
+                "setEmpty":        "empty",
+            }
+            if action in SIGNAL_ACTION_MAP:
+                on = value.strip().lower() == "true"
+                signal_key = SIGNAL_ACTION_MAP[action]
+
+                # Persist to config
+                config = {}
+                if os.path.exists(self.config_path):
+                    with open(self.config_path, "r", encoding="utf-8") as f:
+                        config = json.load(f)
+                signals = config.get("Signal Controls", config.get("signal_states", {}))
+                signals[signal_key] = on
+                config.pop("signal_states", None)
+                config["Signal Controls"] = signals
+                with open(self.config_path, "w", encoding="utf-8") as f:
+                    json.dump(config, f, indent=2)
+
+                # TODO: write to hardware relay here via modbus_relay_code
+                # e.g. set_relay_output(signal_key, on)
+
+                print(f"✅ Signal {action} ({signal_key}) → {on}")
+                return json.dumps({"ok": True, "signal": signal_key, "value": on})
+
+            return json.dumps({"ok": False, "message": f"Unknown action: {action}"})
+
         except Exception as e:
             return json.dumps({
                 "ok": False,

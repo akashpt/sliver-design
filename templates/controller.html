@@ -8,6 +8,150 @@
     <link rel="stylesheet" href="../static/css/controller.css" />
     <link rel="stylesheet" href="../static/css/style.css" />
     <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <style>
+      .sw {
+        opacity: 1;
+      }
+      /* ── Signal & Light Controls list ── */
+      .signal-list {
+        display: flex;
+        flex-direction: column;
+      }
+      .signal-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 13px 20px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+        transition: background 0.15s;
+        cursor: default;
+      }
+      .signal-row:last-child {
+        border-bottom: none;
+      }
+      .signal-row:hover {
+        background: rgba(0, 0, 0, 0.025);
+      }
+      .signal-row-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .signal-dot {
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        display: inline-block;
+        margin-right: 15px;
+      }
+      .signal-name {
+        font-size: 0.92rem;
+        font-weight: 600;
+        color: #1e293b;
+        line-height: 1.2;
+      }
+      .signal-key {
+        font-size: 0.72rem;
+        color: #94a3b8;
+        font-family: monospace;
+        margin-top: 2px;
+      }
+      .signal-row-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      /* Right card control rows */
+      .signal-ctrl-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 13px 20px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      }
+      .signal-ctrl-row:last-child {
+        border-bottom: none;
+      }
+      .signal-ctrl-row:hover {
+        background: rgba(0, 0, 0, 0.025);
+      }
+      .signal-ctrl-name {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.92rem;
+        font-weight: 600;
+        color: #1e293b;
+      }
+      .signal-badge {
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        padding: 3px 9px;
+        border-radius: 20px;
+        min-width: 38px;
+        text-align: center;
+        transition:
+          background 0.2s,
+          color 0.2s;
+      }
+      .signal-badge.off {
+        background: #f1f5f9;
+        color: #94a3b8;
+      }
+      .signal-badge.on {
+        background: #dcfce7;
+        color: #16a34a;
+      }
+
+      /* ── Toggle switch explicit colors for signal control card ── */
+      #signalControlCard .sw {
+        position: relative;
+        display: inline-block;
+        width: 46px;
+        height: 26px;
+        flex-shrink: 0;
+        cursor: pointer;
+      }
+      #signalControlCard .sw input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+        position: absolute;
+      }
+      #signalControlCard .sw-track {
+        position: absolute;
+        inset: 0;
+        border-radius: 999px;
+        background: #cbd5e1;
+        transition: background 0.22s;
+      }
+      #signalControlCard .sw-track::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #ffffff;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+        transition: transform 0.22s;
+      }
+      #signalControlCard .sw input:checked ~ .sw-track {
+        background: #16a34a;
+      }
+      #signalControlCard .sw input:checked ~ .sw-track::after {
+        transform: translateX(20px);
+      }
+      #signalControlCard .sw.on .sw-track {
+        background: #16a34a;
+      }
+      #signalControlCard .sw.on .sw-track::after {
+        transform: translateX(20px);
+      }
+    </style>
   </head>
 
   <body>
@@ -57,25 +201,20 @@
         <div class="hdr-clock" id="clock">--:--:--</div>
       </header>
 
-      <div class="body-wrap ">
+      <div class="body-wrap">
         <!-- ═══ SIDEBAR ═══ -->
         <aside>
           <div class="sec-lbl">Menu</div>
-          <a href="index.html" class="nav-btn  " id="menuDashboard">
+          <a href="index.html" class="nav-btn" id="menuDashboard">
             <i class="fa-solid fa-gauge"></i> Dashboard
           </a>
           <div class="nav-btn" onclick="bridge?.goReport()" id="menuReport">
             <i class="fas fa-file-lines"></i> Report
           </div>
-          <a class="nav-btn active"  href="controller.html">
+          <a class="nav-btn active" href="controller.html">
             <i class="fas fa-sliders"></i> Controller
           </a>
-          <a
-            href="training.html"
-         
-            class="nav-btn"
-            id="menuTraining"
-          >
+          <a href="training.html" class="nav-btn" id="menuTraining">
             <i class="fas fa-graduation-cap"></i> Training
           </a>
           <a class="nav-btn" href="settings.html">
@@ -209,6 +348,284 @@
               </div>
             </div>
           </div>
+
+          <!-- ④ SIGNAL CARDS — Status (left) + Controls (right) -->
+          <div class="ctrl-grid-2" style="align-items: start">
+            <!-- LEFT: Status Card -->
+            <div class="ctrl-card" id="signalStatusCard">
+              <div class="ctrl-card-head accent-brand">
+                <div class="ctrl-card-head-icon">
+                  <i class="fa-solid fa-signal"></i>
+                </div>
+                <div>
+                  <div class="ctrl-card-title">Signal Status</div>
+                  <div class="ctrl-card-desc">Live output state monitor</div>
+                </div>
+              </div>
+              <div class="ctrl-card-body" style="padding: 0">
+                <div class="signal-list">
+                  <div class="signal-row" id="signal1Card" data-on="false">
+                    <div class="signal-row-left">
+                      <span
+                        class="signal-dot"
+                        style="background: #e2e8f0; border: 1.5px solid #94a3b8"
+                      ></span>
+                      <div>
+                        <div class="signal-name">Signal 1</div>
+                      </div>
+                    </div>
+                    <span class="signal-badge off" id="signal1Badge"
+                      >OFF</span
+                    >
+                  </div>
+
+                  <div class="signal-row" id="signal2Card" data-on="false">
+                    <div class="signal-row-left">
+                      <span
+                        class="signal-dot"
+                        style="background: #7c3aed"
+                      ></span>
+                      <div>
+                        <div class="signal-name">Signal 2</div>
+                      </div>
+                    </div>
+                    <span class="signal-badge off" id="signal2Badge">OFF</span>
+                  </div>
+
+                  <div class="signal-row" id="signal3Card" data-on="false">
+                    <div class="signal-row-left">
+                      <span
+                        class="signal-dot"
+                        style="background: #f97316"
+                      ></span>
+                      <div>
+                        <div class="signal-name">Signal 3</div>
+                      </div>
+                    </div>
+                    <span class="signal-badge off" id="signal3Badge"
+                      >OFF</span
+                    >
+                  </div>
+
+                  <div class="signal-row" id="signal4Card" data-on="false">
+                    <div class="signal-row-left">
+                      <span
+                        class="signal-dot"
+                        style="background: #16a34a"
+                      ></span>
+                      <div>
+                        <div class="signal-name">Signal 4</div>
+                      </div>
+                    </div>
+                    <span class="signal-badge off" id="signal4Badge"
+                      >OFF</span
+                    >
+                  </div>
+
+                  <div class="signal-row" id="signal5Card" data-on="false">
+                    <div class="signal-row-left">
+                      <span
+                        class="signal-dot"
+                        style="background: #eab308"
+                      ></span>
+                      <div>
+                        <div class="signal-name">Signal 5</div>
+                      </div>
+                    </div>
+                    <span class="signal-badge off" id="signal5Badge"
+                      >OFF</span
+                    >
+                  </div>
+
+                  <div class="signal-row" id="signal6Card" data-on="false">
+                    <div class="signal-row-left">
+                      <span
+                        class="signal-dot"
+                        style="background: #dc2626"
+                      ></span>
+                      <div>
+                        <div class="signal-name">Signal 6</div>
+                      </div>
+                    </div>
+                    <span class="signal-badge off" id="signal6Badge">OFF</span>
+                  </div>
+
+                  <div class="signal-row" id="signal7Card" data-on="false">
+                    <div class="signal-row-left">
+                      <span
+                        class="signal-dot"
+                        style="
+                          background: #e5e7eb;
+                          border: 1.5px dashed #9ca3af;
+                        "
+                      ></span>
+                      <div>
+                        <div class="signal-name">Signal 7</div>
+                      </div>
+                    </div>
+                    <span class="signal-badge off" id="signal7Badge">OFF</span>
+                  </div>
+                </div>
+                <!-- end .signal-list -->
+              </div>
+            </div>
+            <!-- end LEFT card -->
+
+            <!-- RIGHT: Toggle Controls Card -->
+            <div class="ctrl-card" id="signalControlCard">
+              <div class="ctrl-card-head accent-amber">
+                <div class="ctrl-card-head-icon">
+                  <i class="fa-solid fa-tower-broadcast"></i>
+                </div>
+                <div>
+                  <div class="ctrl-card-title">Signal Controls</div>
+                  <div class="ctrl-card-desc">Manually toggle each output</div>
+                </div>
+              </div>
+              <div class="ctrl-card-body" style="padding: 0">
+                <div class="signal-list">
+                  <div class="signal-ctrl-row">
+                    <div class="signal-ctrl-name">
+                      <span
+                        class="signal-dot"
+                        style="background: #e2e8f0; border: 1.5px solid #94a3b8"
+                      ></span>
+                      White Light
+                    </div>
+                    <label class="sw">
+                      <input
+                        type="checkbox"
+                        id="whitelightToggle"
+                        data-signal="whitelight"
+                        data-fn="setWhiteLight"
+                      />
+                      <span class="sw-track"></span>
+                    </label>
+                  </div>
+
+                  <div class="signal-ctrl-row">
+                    <div class="signal-ctrl-name">
+                      <span
+                        class="signal-dot"
+                        style="background: #7c3aed"
+                      ></span>
+                      UV Light
+                    </div>
+                    <label class="sw">
+                      <input
+                        type="checkbox"
+                        id="uvlightToggle"
+                        data-signal="uvlight"
+                        data-fn="setUVLight2"
+                      />
+                      <span class="sw-track"></span>
+                    </label>
+                  </div>
+
+                  <div class="signal-ctrl-row">
+                    <div class="signal-ctrl-name">
+                      <span
+                        class="signal-dot"
+                        style="background: #f97316"
+                      ></span>
+                      Machine Break
+                    </div>
+                    <label class="sw">
+                      <input
+                        type="checkbox"
+                        id="machinebreakToggle"
+                        data-signal="machinebreak"
+                        data-fn="setMachineBreak"
+                      />
+                      <span class="sw-track"></span>
+                    </label>
+                  </div>
+
+                  <div class="signal-ctrl-row">
+                    <div class="signal-ctrl-name">
+                      <span
+                        class="signal-dot"
+                        style="background: #16a34a"
+                      ></span>
+                      Green Light
+                    </div>
+                    <label class="sw">
+                      <input
+                        type="checkbox"
+                        id="greenlightToggle"
+                        data-signal="greenlight"
+                        data-fn="setGreenLight"
+                      />
+                      <span class="sw-track"></span>
+                    </label>
+                  </div>
+
+                  <div class="signal-ctrl-row">
+                    <div class="signal-ctrl-name">
+                      <span
+                        class="signal-dot"
+                        style="background: #eab308"
+                      ></span>
+                      Yellow Light
+                    </div>
+                    <label class="sw">
+                      <input
+                        type="checkbox"
+                        id="yellowlightToggle"
+                        data-signal="yellowlight"
+                        data-fn="setYellowLight"
+                      />
+                      <span class="sw-track"></span>
+                    </label>
+                  </div>
+
+                  <div class="signal-ctrl-row">
+                    <div class="signal-ctrl-name">
+                      <span
+                        class="signal-dot"
+                        style="background: #dc2626"
+                      ></span>
+                      Red Light
+                    </div>
+                    <label class="sw">
+                      <input
+                        type="checkbox"
+                        id="redlightToggle"
+                        data-signal="redlight"
+                        data-fn="setRedLight"
+                      />
+                      <span class="sw-track"></span>
+                    </label>
+                  </div>
+
+                  <div class="signal-ctrl-row">
+                    <div class="signal-ctrl-name">
+                      <span
+                        class="signal-dot"
+                        style="
+                          background: #e5e7eb;
+                          border: 1.5px dashed #9ca3af;
+                        "
+                      ></span>
+                      Empty
+                    </div>
+                    <label class="sw">
+                      <input
+                        type="checkbox"
+                        id="emptyToggle"
+                        data-signal="empty"
+                        data-fn="setEmpty"
+                      />
+                      <span class="sw-track"></span>
+                    </label>
+                  </div>
+                </div>
+                <!-- end .signal-list -->
+              </div>
+            </div>
+            <!-- end RIGHT card -->
+          </div>
+          <!-- end signal ctrl-grid-2 -->
 
           <!-- ④ MANUAL CONTROLS — 6 toggles -->
           <div id="manualSection" class="hidden-section">
