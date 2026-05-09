@@ -217,6 +217,45 @@ function debounce(fn, delay) {
   };
 }
 
+function callBridgeSlot(slotName, ...args) {
+  return new Promise((resolve, reject) => {
+    if (!bridge || typeof bridge[slotName] !== "function") {
+      resolve(null);
+      return;
+    }
+
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+
+    const timeout = setTimeout(() => {
+      if (!settled) reject(new Error(`${slotName} bridge call timed out`));
+    }, 15000);
+
+    try {
+      const result = bridge[slotName](...args, (value) => {
+        clearTimeout(timeout);
+        finish(value);
+      });
+
+      if (result !== undefined) {
+        clearTimeout(timeout);
+        if (result && typeof result.then === "function") {
+          result.then(finish).catch(reject);
+        } else {
+          finish(result);
+        }
+      }
+    } catch (err) {
+      clearTimeout(timeout);
+      reject(err);
+    }
+  });
+}
+
 // ─── Fetch Job IDs & Thresholds from Bridge ─────────────────────────
 async function loadDropdownData() {
   try {
@@ -695,7 +734,8 @@ async function startLaptopWebcam() {
     videoElement.srcObject = stream;
     await videoElement.play();
 
-    showToast("✅ Laptop Webcam Started", 2500);
+    showToast("Laptop Webcam Started", 2500);
+    return true;
   } catch (err) {
     console.error("Webcam error:", err);
     showToast(
@@ -703,11 +743,12 @@ async function startLaptopWebcam() {
       4000,
       "error",
     );
+    return false;
   }
 }
 
 // ─── Start Detection ────────────────────────────────────────────────
-function startDetection() {
+async function startDetection() {
   console.log("🔥 startDetection called");
   console.log("currentJobId =", currentJobId);
   console.log("currentThreshold =", currentThreshold);
@@ -729,16 +770,19 @@ function startDetection() {
 
   if (bridge && typeof bridge.startCamera === "function") {
     try {
-      const response = bridge.startCamera("prediction");
-      if (response === "Machine OFF"){
-        showToast("✅ Industrial Camera Started via Bridge", 2500);
-      }
-      else{
+      const response = await callBridgeSlot("startCamera", "prediction");
+      if (response === "Machine OFF") {
         alert("Machine Not ON");
         stopDetection();
         return;
       }
-      
+      if (response !== "OK" && response !== "Camera Already Running") {
+        showToast(response || "Camera not available", 4000, "error");
+        stopDetection();
+        return;
+      }
+      showToast("Industrial Camera Started via Bridge", 2500);
+
 
       if (bridge.frame_signal && !bridge.frame_signal._connected) {
         bridge.frame_signal.connect((base64Image) => {
@@ -748,10 +792,12 @@ function startDetection() {
       }
     } catch (e) {
       console.error(e);
-      startLaptopWebcam();
+      const webcamStarted = await startLaptopWebcam();
+      if (!webcamStarted) stopDetection();
     }
   } else {
-    startLaptopWebcam();
+    const webcamStarted = await startLaptopWebcam();
+    if (!webcamStarted) stopDetection();
   }
 
 
