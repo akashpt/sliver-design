@@ -16,11 +16,11 @@ client = ModbusClient(
 )
 connection = client.connect()
 
-print('checking',connection)
+# print('checking',connection)
 
 # === Digital Input Readers (DI1 to DI8) ===
 # read_di1
-def whitelight():
+def machine_status():
     try:
         rr = client.read_discrete_inputs(0, 8, unit=SLAVE_ID)
         return rr.bits[0] if not rr.isError() else False
@@ -28,7 +28,7 @@ def whitelight():
         return False
 
 # read_di2
-def uvlight():
+def start_button():
     try:
         rr = client.read_discrete_inputs(0, 8, unit=SLAVE_ID)
         return rr.bits[1] if not rr.isError() else False
@@ -36,7 +36,7 @@ def uvlight():
         return False
 
 # read_di3
-def machinebreak():
+def reset_button():
     try:
         rr = client.read_discrete_inputs(0, 8, unit=SLAVE_ID)
         return rr.bits[2] if not rr.isError() else False
@@ -44,7 +44,7 @@ def machinebreak():
         return False
 
 # read_di4
-def greenlight():
+def empty_4():
     try:
         rr = client.read_discrete_inputs(0, 8, unit=SLAVE_ID)
         return rr.bits[3] if not rr.isError() else False
@@ -52,7 +52,7 @@ def greenlight():
         return False
 
 # read_di5
-def yellowlight():
+def empty_5():
     try:
         rr = client.read_discrete_inputs(0, 8, unit=SLAVE_ID)
         return rr.bits[4] if not rr.isError() else False
@@ -60,7 +60,7 @@ def yellowlight():
         return False
     
 # read_di6
-def redlight():
+def empty_6():
     try:
         rr = client.read_discrete_inputs(0, 8, unit=SLAVE_ID)
         return rr.bits[5] if not rr.isError() else False
@@ -68,7 +68,7 @@ def redlight():
         return False
 
 # read_di7
-def empty():
+def empty_7():
     try:
         rr = client.read_discrete_inputs(0, 8, unit=SLAVE_ID)
         return rr.bits[6] if not rr.isError() else False
@@ -76,7 +76,7 @@ def empty():
         return False
 
 # read_di8
-def empty():
+def empty_8():
     try:
         rr = client.read_discrete_inputs(0, 8, unit=SLAVE_ID)
         return rr.bits[7] if not rr.isError() else False
@@ -176,15 +176,19 @@ def turn_off_empty():
         return False
 
 
-def turn_on_empty(): 
+def break_on(): 
     try:
+
         client.write_coil(7, True, unit=SLAVE_ID)
+        return True
+
     except Exception as e:
         return False
 
-def turn_off_empty(): 
+def break_off(): 
     try:
         client.write_coil(7, False, unit=SLAVE_ID)
+        return True
     except Exception as e:
         return False
 
@@ -196,7 +200,10 @@ def turn_off_all_relays():
     except Exception as e:
         return False
 
-
+# data = machine_status()
+# print(data)
+# break_off()
+# reset_button()
 # turn_on_whitelight()
 # time.sleep(2)
 # turn_off_greenlight()

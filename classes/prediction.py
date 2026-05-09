@@ -189,7 +189,7 @@ class StripColorPrediction:
 
             bg_mask = gray_roi < bg_threshold
 
-            print("Background Threshold =", bg_threshold)
+            # print("Background Threshold =", bg_threshold)
 
             # find background contours - Find Connected Background Regions
             contours, _ = cv2.findContours(

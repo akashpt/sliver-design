@@ -558,6 +558,8 @@ class Bridge(QObject):
     @pyqtSlot(str,result=str)
     def startCamera(self,process):
         self.process = process
+        if not machine_status():
+            return "Machine OFF"
 
         # For obseravtion - ignored frame details
         self.session_start_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
@@ -604,7 +606,7 @@ class Bridge(QObject):
                 print("❌ Webcam not available")
                 return "Camera not available"
 
-            print("✅ Using Webcam")
+            # print("✅ Using Webcam")
             self.apply_webcam_exposure(exposure)            
 
         self.camera_open = True
@@ -617,7 +619,7 @@ class Bridge(QObject):
             # Continue live updates
             self.pr_time = self.get_prediction_interval_seconds()
             self.last_prediction_interval_seconds = self.pr_time
-            print(f"⏱ Prediction interval: {self.pr_time} seconds")
+            # print(f"⏱ Prediction interval: {self.pr_time} seconds")
             self.timer.start(self.pr_time * 1000)
 
         return "OK"
@@ -713,44 +715,53 @@ class Bridge(QObject):
             "bad": self.bad,
             "status": "defect"
         }
+        reset = reset_button()
+        if reset:
+            break_off()
+            counts_data['reset_close'] = True
+        else:
+            counts_data['reset_close'] = False
+
         self.counts_signal.emit(json.dumps(counts_data))
+            
 
     def grab_frame(self):
         try:
-            # frame = None
+            frame = None
 
             # # =========================
             # # MINDVISION CAMERA
             # # =========================
-            # if self.use_mindvision and self.camera:
-            #     frame = self.camera.get_frame()
+            if self.use_mindvision and self.camera:
+                frame = self.camera.get_frame()
 
-            #     if frame is None:
-            #         print("⚠️ MindVision lost → switching to webcam")
-            #         self.use_mindvision = False
-            #         self.cap = cv2.VideoCapture(0)
-            #         return
+                if frame is None:
+                    print("⚠️ MindVision lost → switching to webcam")
+                    self.use_mindvision = False
+                    self.cap = cv2.VideoCapture(0)
+                    return
 
 
-            #     # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
             # # =========================
             # # WEBCAM
             # # =========================
-            # elif self.cap:
-            #     ret, frame = self.cap.read()
-            #     if not ret:
-            #         return
+            elif self.cap:
+                ret, frame = self.cap.read()
+                if not ret:
+                    return
 
-            # else:
-            #     return
+            else:
+                return
             
             # =========================
             # 🔥 ROTATE FRAME
             # =========================
             # frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
 
-            frame = cv2.imread(r"/home/texa_developer/Divya Data/i_sliver-design/strips.jpeg")
+            # frame = cv2.imread(r"/home/texa_developer/Divya Data/i_sliver-design/strips.jpeg")
             # frame = cv2.imread(r"D:\Texa\sliver\sliver-design\Sliver_Data\WhatsApp Image 2026-04-29 at 2.33.25 PM.jpeg")
 
             # =========================defect_path
@@ -860,7 +871,7 @@ class Bridge(QObject):
 
 
                     if saved:
-                        from classes.send_mail import send_email_with_attachments
+                        # from classes.send_mail import send_email_with_attachments
                         import threading
 
                         defect_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
@@ -898,11 +909,11 @@ class Bridge(QObject):
                             print("❌ Error reading training settings for email:", e)
 
                         # EXISTING THREAD BELOW
-                        threading.Thread(
-                            target=send_email_with_attachments,
-                            args=(str(file_path), machine_no, frame_no, material, training_color, defect_time),
-                            daemon=True
-                        ).start()
+                        # threading.Thread(
+                        #     target=send_email_with_attachments,
+                        #     args=(str(file_path), machine_no, frame_no, material, training_color, defect_time),
+                        #     daemon=True
+                        # ).start()
                         print(f"Saved: {file_path}")
                        
                         # defect_payload = {
@@ -1000,7 +1011,7 @@ class Bridge(QObject):
 
         elif status in ["defect", "strip missing"]:
             self.bad += 1
-
+            break_on()
 
         # Replace frame with processed image 
         # if processed_img is not None:
@@ -1471,7 +1482,7 @@ class Bridge(QObject):
                 "defective": bad
             }
 
-            print("Returning counts =", data)
+            # print("Returning counts =", data)
             return json.dumps(data)
 
         except Exception as e:

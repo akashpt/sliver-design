@@ -51,6 +51,10 @@ document.addEventListener("DOMContentLoaded", function () {
           // alert("checking");
           loadDefectImagesFromBridge();
         }
+        
+        if(parsed.reset_close){
+          restartFromModal();
+        }
       });
 
       if (bridge.defect_signal) {
@@ -725,8 +729,16 @@ function startDetection() {
 
   if (bridge && typeof bridge.startCamera === "function") {
     try {
-      bridge.startCamera("prediction");
-      showToast("✅ Industrial Camera Started via Bridge", 2500);
+      const response = bridge.startCamera("prediction");
+      if (response === "Machine OFF"){
+        showToast("✅ Industrial Camera Started via Bridge", 2500);
+      }
+      else{
+        alert("Machine Not ON");
+        stopDetection();
+        return;
+      }
+      
 
       if (bridge.frame_signal && !bridge.frame_signal._connected) {
         bridge.frame_signal.connect((base64Image) => {

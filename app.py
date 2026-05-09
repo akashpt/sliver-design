@@ -65,7 +65,7 @@ def load_app_settings():
             with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=2)
 
-        print("✅ settings.json loaded:", config)
+        # print("✅ settings.json loaded:", config)
         return config
 
     except Exception as e:
@@ -96,7 +96,7 @@ class MainWindow(QMainWindow):
         self.view.page().setWebChannel(self.channel)
 
         # Load finished handler
-        self.view.loadFinished.connect(self.on_load_finished)
+        # self.view.loadFinished.connect(self.on_load_finished)
 
         # Load initial page
         self.load_page("index.html")
@@ -157,8 +157,8 @@ class MainWindow(QMainWindow):
 
         event.accept()
 
-    def on_load_finished(self):
-        print("✅ Page loaded successfully")
+    # def on_load_finished(self):
+    #     print("✅ Page loaded successfully")
 
 
 # ------------------- MAIN -------------------
