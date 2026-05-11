@@ -56,7 +56,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if(parsed.reset_close){
           restartFromModal();
         }
-        const live_prdict = false;
+        let live_prdict = false;
         if(parsed.prediction_run && !live_prdict){
             startDetection();
             live_prdict = true;
@@ -961,12 +961,15 @@ function updateVideoFeedFromBase64(base64Image) {
     feedImg = document.createElement("img");
     feedImg.id = "qtFrameImg";
     feedImg.style.cssText = `
+      position: absolute;
+      inset: 0;
       width: 100%; 
       height: 100%; 
-      object-fit: cover; 
+      object-fit: contain; 
       background: #000;
       border-radius: 6px;
       display: block;
+      z-index: 2;
     `;
 
     // Hide the <video> element when using Qt frames
