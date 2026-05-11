@@ -635,47 +635,58 @@ class Bridge(QObject):
             turn_off_bluelight()
         except Exception as e:
             print("Turn off the warning :", e)
+    
+    @pyqtSlot()
+    def camera_stop(self):
+        try:
+            if not self.camera_open:
+                print("⚠️ Camera already stopped")
+                return
+
+            print("🛑 Stopping camera...")
+
+            self.timer.stop()
+
+            if self.use_mindvision and self.camera:
+                try:
+                    self.camera.stop()
+                    print("✅ MindVision stopped")
+                except Exception as e:
+                    print("❌ MindVision stop error:", e)
+
+                self.camera = None
+
+            if self.cap:
+                self.cap.release()
+                self.cap = None
+                print("✅ Webcam released")
+
+            self.camera_open = False
+            print("✅ Camera fully stopped")
+            # all lights off when camera stops
+            turn_off_greenlight()
+            # turn_off_redlight()
+            turn_off_whitelight()
+
+            # ── Signal Status: camera stopped → all signals OFF ──
+            self.emit_signal_status()
+
+            self.session_end_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+            if self.process == "prediction":
+                self.save_session_txt()
+                print("✅ Prediction session file created")
+        except Exception as e:
+            print("Camera Connection -",e)
+    
 
     @pyqtSlot()
     def stopCamera(self):
-        print("checking.....")
-        # self.prediction_live = False
-        if not self.camera_open:
-            print("⚠️ Camera already stopped")
-            return
-
-        print("🛑 Stopping camera...")
-
-        self.timer.stop()
-
-        if self.use_mindvision and self.camera:
-            try:
-                self.camera.stop()
-                print("✅ MindVision stopped")
-            except Exception as e:
-                print("❌ MindVision stop error:", e)
-
-            self.camera = None
-
-        if self.cap:
-            self.cap.release()
-            self.cap = None
-            print("✅ Webcam released")
-
-        self.camera_open = False
-        print("✅ Camera fully stopped")
-        # all lights off when camera stops
-        turn_off_greenlight()
-        # turn_off_redlight()
-        turn_off_whitelight()
-
-        # ── Signal Status: camera stopped → all signals OFF ──
-        self.emit_signal_status()
-
-        self.session_end_time = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-        if self.process == "prediction":
-            self.save_session_txt()
-            print("✅ Prediction session file created")
+        try:
+            self.prediction_live = False
+            self.camera_stop()
+        except Exception as e:
+            print("Camera Connection Error",e)
+        
 
     def save_session_txt(self):
         try:
