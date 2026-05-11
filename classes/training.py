@@ -12,7 +12,7 @@ class StripColorTraining:
         
         self.expected_strip_count = 8
         self.minimum_strip_gap = 35
-        self.center_crop_percent = 0.25
+        self.center_crop_percent = 0.35
 
     # ---------------- DETECT STRIPS ----------------
     def detect_horizontal_strips(self, image):

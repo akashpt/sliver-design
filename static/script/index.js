@@ -58,7 +58,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         const live_prdict = false;
         if(parsed.prediction_run && !live_prdict){
-            stopPradictionLive();
+            startDetection();
             live_prdict = true;
         }else{
           live_prdict = false;
@@ -643,8 +643,8 @@ function resetConfig() {
 function resetToInitialState() {
   isRunning = false;
   pradictionlive = false;
-  stopAllCameras();
-
+  // stopAllCameras();
+  stopPradictionLive();
   document.getElementById("startBtn").disabled = true;
   document.getElementById("stopBtn").disabled = true;
   document.getElementById("okBtn").disabled = true;
@@ -699,23 +699,23 @@ function hideCameraFeed() {
   if (existingQtImg) existingQtImg.remove();
 }
 
-function stopAllCameras() {
-  if (currentStream) {
-    currentStream.getTracks().forEach((track) => track.stop());
-    currentStream = null;
-  }
+// function stopAllCameras() {
+//   if (currentStream) {
+//     currentStream.getTracks().forEach((track) => track.stop());
+//     currentStream = null;
+//   }
 
-  // Also stop Qt bridge camera if available
-  if (bridge && typeof bridge.stopCamera === "function") {
-    try {
-      bridge.stopCamera();
-    } catch (e) {
-      console.warn("Bridge stopCamera failed:", e);
-    }
-  }
+//   // Also stop Qt bridge camera if available
+//   if (bridge && typeof bridge.stopCamera === "function") {
+//     try {
+//       bridge.stopCamera();
+//     } catch (e) {
+//       console.warn("Bridge stopCamera failed:", e);
+//     }
+//   }
 
-  hideCameraFeed(); // This will now properly clean up
-}
+//   hideCameraFeed(); // This will now properly clean up
+// }
 
 // ─── Start Laptop Webcam (Fallback) ─────────────────────────────────
 async function startLaptopWebcam() {
@@ -831,20 +831,23 @@ function stopDetection() {
   pradictionlive = false;
 
   // Stop everything
-  stopAllCameras();
+  // stopAllCameras();
 
+  if (currentStream) {
+    currentStream.getTracks().forEach((track) => track.stop());
+    currentStream = null;
+  }
+
+  // Also stop Qt bridge camera if available
   if (bridge && typeof bridge.stopCamera === "function") {
     try {
       bridge.stopCamera();
     } catch (e) {
-      console.error("Error stopping camera via bridge:", e);
+      console.warn("Bridge stopCamera failed:", e);
     }
   }
 
-  // if (demoDefectInterval) {
-  //   clearInterval(demoDefectInterval);
-  //   demoDefectInterval = null;
-  // }
+  hideCameraFeed(); // This will now properly clean up
 
   stopUptime();
   setUIState(false);
@@ -864,21 +867,21 @@ function stopPradictionLive() {
 
   pradictionlive = false;
 
-  // Stop everything
-  stopAllCameras();
+  if (currentStream) {
+    currentStream.getTracks().forEach((track) => track.stop());
+    currentStream = null;
+  }
 
-  if (bridge && typeof bridge.stopCamera === "function") {
+  // Also stop Qt bridge camera if available
+  if (bridge && typeof bridge.camera_stop === "function") {
     try {
       bridge.camera_stop();
     } catch (e) {
-      console.error("Error stopping camera via bridge:", e);
+      console.warn("Bridge stopCamera failed:", e);
     }
   }
 
-  // if (demoDefectInterval) {
-  //   clearInterval(demoDefectInterval);
-  //   demoDefectInterval = null;
-  // }
+  hideCameraFeed(); // This will now properly clean up
 
   stopUptime();
   setUIState(false);
