@@ -18,6 +18,7 @@ let demoDefectInterval = null;
 let bridge = null;
 let currentStream = null;
 let pradictionlive = false;
+let bridgePredictionStartRequested = false;
 
 let defectHistory = [];
 let currentModalIndex = -1;
@@ -56,12 +57,13 @@ document.addEventListener("DOMContentLoaded", function () {
         if(parsed.reset_close){
           restartFromModal();
         }
-        let live_prdict = false;
-        if(parsed.prediction_run && !live_prdict){
+         if (parsed.prediction_run) {
+          if (!bridgePredictionStartRequested && !isRunning) {
+            bridgePredictionStartRequested = true;
             startDetection();
-            live_prdict = true;
-        }else{
-          live_prdict = false;
+          }
+        } else {
+          bridgePredictionStartRequested = false;
           stopPradictionLive();
         }
       });
@@ -519,6 +521,22 @@ function checkCanConfirm() {
   document.getElementById("okBtn").disabled = !(jobId && threshold);
 }
 
+function syncCurrentConfigFromInputs() {
+  const jobInput = document.getElementById("jobIdInput");
+  const thresholdInput = document.getElementById("thresholdInput");
+
+  const jobId = jobInput ? jobInput.value.trim() : "";
+  const threshold = thresholdInput ? thresholdInput.value.trim() : "";
+
+  if (jobId) currentJobId = jobId;
+  if (threshold) currentThreshold = threshold;
+
+  return {
+    jobId: currentJobId,
+    threshold: currentThreshold,
+  };
+}
+
 // ─── Confirm Configuration ──────────────────────────────────────────
 async function updateThresholdFromSelectedJob() {
   try {
@@ -557,16 +575,12 @@ async function updateThresholdFromSelectedJob() {
   }
 }
 function confirmConfig() {
-  const jobId = document.getElementById("jobIdInput").value;
-  const threshold = document.getElementById("thresholdInput").value.trim();
+  const { jobId, threshold } = syncCurrentConfigFromInputs();
 
   if (!jobId || !threshold) {
     showToast("❌ Please select Job ID and enter Threshold", 3000, "error");
     return;
   }
-
-  currentJobId = jobId;
-  currentThreshold = threshold;
 
   saveUserConfigToBridge(jobId, threshold);
 
@@ -750,7 +764,14 @@ async function startDetection() {
   console.log("currentJobId =", currentJobId);
   console.log("currentThreshold =", currentThreshold);
 
-  if (isRunning || !currentJobId || !currentThreshold) {
+  if (isRunning) {
+    showToast("Detection is already running", 2500, "warning");
+    return;
+  }
+
+  const { jobId, threshold } = syncCurrentConfigFromInputs();
+
+  if (!jobId || !threshold) {
     showToast("❌ Please click OK first", 3000, "error");
     return;
   }

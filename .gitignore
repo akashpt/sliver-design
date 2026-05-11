@@ -31,7 +31,10 @@ dist/
 __pycache__/
 *.pyc
 
-Sliver_Data/
+# Local generated app data
+/Sliver_Data/
+/Sliver_Data/**
+/Sliver_Data/**/*.pdf
+/Sliver_Data/**/*.json
 count.txt
 signal.txt*.bmp
-Sliver_Data/sliver.db
