@@ -682,6 +682,7 @@ class Bridge(QObject):
     @pyqtSlot()
     def stopCamera(self):
         try:
+            print("checking...123")
             self.prediction_live = False
             self.camera_stop()
         except Exception as e:
@@ -736,18 +737,18 @@ class Bridge(QObject):
         reset = reset_button()
 
         if reset:
-            # break_off()
+            break_off()
             counts_data['reset_close'] = True
             # self.reset_click = True
         else:
             counts_data['reset_close'] = False
         
         machine = machine_status()
-        print(self.prediction_live)
-        if (machine or reset) and self.prediction_live:
+        # print(self.prediction_live)
+        if (machine) and self.prediction_live:
             counts_data['prediction_run'] = True
         
-        print(counts_data,machine)
+        # print(counts_data,machine)
         self.counts_signal.emit(json.dumps(counts_data))
             
 
@@ -969,7 +970,7 @@ class Bridge(QObject):
                         # print("saved image path =", file_path)
                         # print("db image path =", bad_image_path)
                         self.emit_defect_payload(status, file_path, raw_path)
-                        self.stopCamera()
+                        self.camera_stop()
                         return
 
             if self.process == "prediction" and status != "ignored":
@@ -1037,7 +1038,7 @@ class Bridge(QObject):
 
         elif status in ["defect", "strip missing"]:
             self.bad += 1
-            # break_on()
+            break_on()
 
         # Replace frame with processed image 
         # if processed_img is not None:

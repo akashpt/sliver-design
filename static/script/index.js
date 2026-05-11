@@ -62,6 +62,7 @@ document.addEventListener("DOMContentLoaded", function () {
             live_prdict = true;
         }else{
           live_prdict = false;
+          stopPradictionLive();
         }
       });
 
