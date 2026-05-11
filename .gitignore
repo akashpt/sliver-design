@@ -31,7 +31,7 @@ dist/
 __pycache__/
 *.pyc
 
-
+Sliver_Data/
 count.txt
 signal.txt*.bmp
 Sliver_Data/sliver.db
