@@ -58,7 +58,8 @@ class Bridge(QObject):
         self.last_prediction_interval_seconds = self.pr_time
         # self.pr_time = 1  # seconds
         self.process = None
-        
+        self.prediction_live = False
+        self.reset_click = False
 
         self.count_time = QTimer()
         self.count_time.timeout.connect(self.count_show)
@@ -103,6 +104,8 @@ class Bridge(QObject):
         if self.threshold:
             self.detector.color_threshold = float(self.threshold)
             self.get_system_storage()
+        
+        
 
 
     # ====================== SAVE USER CONFIG ======================
@@ -557,6 +560,7 @@ class Bridge(QObject):
    
     @pyqtSlot(str,result=str)
     def startCamera(self,process):
+        self.prediction_live = True
         self.process = process
         if not machine_status():
             return "Machine OFF"
@@ -634,6 +638,8 @@ class Bridge(QObject):
 
     @pyqtSlot()
     def stopCamera(self):
+        print("checking.....")
+        # self.prediction_live = False
         if not self.camera_open:
             print("⚠️ Camera already stopped")
             return
@@ -713,15 +719,24 @@ class Bridge(QObject):
             "inspected": self.inspected,
             "good": self.good,
             "bad": self.bad,
-            "status": "defect"
+            "status": "defect",
+            "prediction_run":False
         }
         reset = reset_button()
+
         if reset:
-            break_off()
+            # break_off()
             counts_data['reset_close'] = True
+            # self.reset_click = True
         else:
             counts_data['reset_close'] = False
-
+        
+        machine = machine_status()
+        print(self.prediction_live)
+        if (machine or reset) and self.prediction_live:
+            counts_data['prediction_run'] = True
+        
+        print(counts_data,machine)
         self.counts_signal.emit(json.dumps(counts_data))
             
 
@@ -939,9 +954,9 @@ class Bridge(QObject):
                                 bad_strip_number
                             )
 
-                        print("✅ DEFECT REPORT SAVED")
-                        print("saved image path =", file_path)
-                        print("db image path =", bad_image_path)
+                        # print("✅ DEFECT REPORT SAVED")
+                        # print("saved image path =", file_path)
+                        # print("db image path =", bad_image_path)
                         self.emit_defect_payload(status, file_path, raw_path)
                         self.stopCamera()
                         return
@@ -1011,12 +1026,12 @@ class Bridge(QObject):
 
         elif status in ["defect", "strip missing"]:
             self.bad += 1
-            break_on()
+            # break_on()
 
         # Replace frame with processed image 
         # if processed_img is not None:
         #     self.current_frame = processed_img
-
+        
         return status,processed_img, raw_img, bad_count, bad_indices
     
     def emit_defect_payload(self, status, file_path, raw_path):
