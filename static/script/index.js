@@ -17,6 +17,7 @@ let uptimeTimer = null;
 let demoDefectInterval = null;
 let bridge = null;
 let currentStream = null;
+let pradictionlive = false;
 
 let defectHistory = [];
 let currentModalIndex = -1;
@@ -54,6 +55,13 @@ document.addEventListener("DOMContentLoaded", function () {
         
         if(parsed.reset_close){
           restartFromModal();
+        }
+        const live_prdict = false;
+        if(parsed.prediction_run && !live_prdict){
+            stopPradictionLive();
+            live_prdict = true;
+        }else{
+          live_prdict = false;
         }
       });
 
@@ -634,6 +642,7 @@ function resetConfig() {
 // ─── Reset to Initial State ─────────────────────────────────────────
 function resetToInitialState() {
   isRunning = false;
+  pradictionlive = false;
   stopAllCameras();
 
   document.getElementById("startBtn").disabled = true;
@@ -680,10 +689,6 @@ function hideCameraFeed() {
   const videoFeed = document.getElementById("videoFeed");
   const noFeed = document.getElementById("noFeed");
   const liveBadge = document.getElementById("liveBadge");
-  const cameraWrap = document.querySelector(".camera-wrap");
-
-  // Stop any stream
-  stopAllCameras();
 
   noFeed.style.display = "flex";
   videoFeed.style.display = "none";
@@ -692,16 +697,6 @@ function hideCameraFeed() {
   // Remove Qt frame image completely when hiding
   const existingQtImg = document.getElementById("qtFrameImg");
   if (existingQtImg) existingQtImg.remove();
-}
-
-function hideCameraFeed() {
-  const videoFeed = document.getElementById("videoFeed");
-  const noFeed = document.getElementById("noFeed");
-  const liveBadge = document.getElementById("liveBadge");
-
-  videoFeed.style.display = "none";
-  noFeed.style.display = "flex";
-  if (liveBadge) liveBadge.style.display = "none";
 }
 
 function stopAllCameras() {
@@ -781,6 +776,7 @@ async function startDetection() {
         stopDetection();
         return;
       }
+      pradictionlive = true;
       showToast("Industrial Camera Started via Bridge", 2500);
 
 
@@ -832,6 +828,7 @@ async function startDetection() {
 // ─── Stop Detection ─────────────────────────────────────────────────
 function stopDetection() {
   if (!isRunning) return;
+  pradictionlive = false;
 
   // Stop everything
   stopAllCameras();
@@ -857,13 +854,47 @@ function stopDetection() {
   // IMPORTANT: Re-enable side menu when stopping
   enableSideMenu();
 
-  showToast("🛑 Detection Stopped", 3000);
+  // showToast("🛑 Detection Stopped", 3000);
   addLog("Detection Stopped");
 }
 
 // ─── UI State ───────────────────────────────────────────────────────
+function stopPradictionLive() {
+  if (!isRunning && !pradictionlive) return;
+
+  pradictionlive = false;
+
+  // Stop everything
+  stopAllCameras();
+
+  if (bridge && typeof bridge.stopCamera === "function") {
+    try {
+      bridge.camera_stop();
+    } catch (e) {
+      console.error("Error stopping camera via bridge:", e);
+    }
+  }
+
+  // if (demoDefectInterval) {
+  //   clearInterval(demoDefectInterval);
+  //   demoDefectInterval = null;
+  // }
+
+  stopUptime();
+  setUIState(false);
+
+  document.getElementById("statusLabel").textContent = "STANDBY";
+
+  // IMPORTANT: Re-enable side menu when stopping
+  enableSideMenu();
+
+  showToast("Detection Stopped", 3000);
+  addLog("Detection Stopped");
+}
+
 function setUIState(running) {
   isRunning = running;
+  if (!running) pradictionlive = false;
   const startBtn = document.getElementById("startBtn");
   const stopBtn = document.getElementById("stopBtn");
   const jobSelect = document.getElementById("jobIdInput");
