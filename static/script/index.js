@@ -643,6 +643,7 @@ function resetConfig() {
 function resetToInitialState() {
   isRunning = false;
   pradictionlive = false;
+  
   // stopAllCameras();
   stopPradictionLive();
   document.getElementById("startBtn").disabled = true;
