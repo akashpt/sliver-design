@@ -1,0 +1,172 @@
+# app.py
+import sys
+import os
+import json
+from datetime import datetime
+from PyQt5.QtWidgets import QApplication, QMainWindow
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtWebChannel import QWebChannel
+from PyQt5.QtCore import QUrl
+from pathlib import Path
+from classes.bridge import Bridge
+from path import TEMPLATES_DIR,REPORT_PAGE,SETTINGS_FILE
+
+IS_WINDOWS = sys.platform.startswith("win")
+IS_LINUX = sys.platform.startswith("linux")
+
+# ===============================
+# Platform selection
+# ===============================
+if IS_LINUX:
+    os.environ["QT_QPA_PLATFORM"] = "xcb"
+elif IS_WINDOWS:
+    os.environ["QT_QPA_PLATFORM"] = "windows"
+
+
+if getattr(sys, 'frozen', False):
+   
+    base = Path(sys.executable).resolve().parent
+    import cv2
+    cv2_path = os.path.dirname(cv2.__file__)
+    os.environ["QT_PLUGIN_PATH"] = os.path.join(cv2_path, "qt", "plugins")
+    os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = os.path.join(cv2_path, "qt", "plugins", "platforms")
+
+else:
+    import cv2 as _cv2
+    qt_plugin_path = os.path.join(os.path.dirname(_cv2.__file__), "qt", "plugins", "platforms")
+    os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = qt_plugin_path
+
+def load_app_settings():
+    default_settings = {
+        "job_id": "",
+        "threshold": "",
+        "camera_name": "MindVision",
+        "exposure": 6000,
+        "min_exposure": 31,
+        "max_exposure": 4063201,
+        "lastSaved": datetime.now().isoformat()
+    }
+
+    try:
+        config = {}
+
+        if SETTINGS_FILE.exists():
+            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                config = json.load(f)
+
+        changed = False
+
+        for key, value in default_settings.items():
+            if key not in config:
+                config[key] = value
+                changed = True
+
+        if changed:
+            with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=2)
+
+        # print("✅ settings.json loaded:", config)
+        return config
+
+    except Exception as e:
+        print("❌ settings.json load error:", e)
+
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(default_settings, f, indent=2)
+
+        return default_settings
+
+
+
+class MainWindow(QMainWindow):
+
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowTitle("Sliver Design System")
+        self.resize(1200, 800)
+
+        # WebEngine View
+        self.view = QWebEngineView()
+        self.setCentralWidget(self.view)
+        # Bridge & WebChannel
+        self.bridge = Bridge(self)
+        self.channel = QWebChannel()
+        self.channel.registerObject("bridge", self.bridge)
+        self.view.page().setWebChannel(self.channel)
+
+        # Load finished handler
+        # self.view.loadFinished.connect(self.on_load_finished)
+
+        # Load initial page
+        self.load_page("index.html")
+
+    def load_page(self, page_name: str):
+        print(f"Switching to page: {page_name}")
+
+        file_path = (TEMPLATES_DIR / page_name).resolve()
+
+        if file_path.exists():
+            self.view.setUrl(QUrl("about:blank"))
+            self.view.load(QUrl.fromLocalFile(str(file_path)))
+        else:
+            print(f"❌ Page not found: {file_path}")
+
+    def open_report_window(self):
+        if (
+            hasattr(self, "report_window")
+            and self.report_window
+            and self.report_window.isVisible()
+        ):
+            self.report_window.activateWindow()
+            return
+
+        self.report_window = QMainWindow()
+        self.report_window.setWindowTitle("Report")
+        self.report_window.setFixedSize(1000, 700)
+
+        view = QWebEngineView()
+        self.report_window.setCentralWidget(view)
+
+        # ✅ Attach bridge to report window also
+        report_channel = QWebChannel()
+        report_channel.registerObject("bridge", self.bridge)
+        view.page().setWebChannel(report_channel)
+
+        # keep reference
+        self.report_channel = report_channel
+
+        report_file = (REPORT_PAGE).resolve()
+
+        if report_file.exists():
+            view.load(QUrl.fromLocalFile(str(report_file)))
+        else:
+            print(f"❌ report.html not found: {report_file}")
+
+        self.report_window.show()
+
+    def closeEvent(self, event):
+        self.bridge.stopCamera()  # Ask bridge to cleanup camera
+        super().closeEvent(event)
+        try:
+            from classes.modbus_relay_code import turn_off_all_relays
+            turn_off_all_relays()
+            print("🟢 Green light OFF (app closed)")
+        except Exception as e:
+            print("❌ Modbus close error:", e)
+
+        event.accept()
+
+    # def on_load_finished(self):
+    #     print("✅ Page loaded successfully")
+
+
+# ------------------- MAIN -------------------
+if __name__ == "__main__":
+    from classes.database import init_db
+    init_db()
+    load_app_settings() 
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec_())

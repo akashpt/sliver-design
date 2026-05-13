@@ -1,0 +1,1505 @@
+// ─── Clock ──────────────────────────────────────────────────────────
+setInterval(() => {
+  document.getElementById("clock").textContent = new Date()
+    .toTimeString()
+    .slice(0, 8);
+}, 1000);
+
+// ─── Global Variables ───────────────────────────────────────────────
+let isRunning = false;
+let currentJobId = "";
+let currentThreshold = "";
+let inspected = 0;
+let good = 0;
+let bad = 0;
+let sessionStart = null;
+let uptimeTimer = null;
+let demoDefectInterval = null;
+let bridge = null;
+let currentStream = null;
+let pradictionlive = false;
+let bridgePredictionStartRequested = false;
+
+let defectHistory = [];
+let currentModalIndex = -1;
+
+// ─── Bridge & Initialization ────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", function () {
+  window.__qtWebChannelConnecting = true;
+
+  new QWebChannel(qt.webChannelTransport, async function (channel) {
+    window.__qtWebChannelConnecting = false;
+    bridge = channel.objects.bridge;
+    window.bridge = bridge;
+    if (bridge) {
+      showToast("✅ Bridge Connected Successfully", 3000);
+      if (bridge) {
+      showToast("✅ Bridge Connected Successfully", 3000);
+
+      // 🔥 ADD THIS HERE
+      bridge.counts_signal.connect((data) => {
+        const parsed = JSON.parse(data);
+
+        inspected = parsed.inspected;
+        good = parsed.good;
+        bad = parsed.bad;
+
+        updateCounters();
+
+        if (
+          (parsed.status === "defect" || parsed.status === "strip missing") &&
+          currentJobId
+        ) {
+          // alert("checking");
+          loadDefectImagesFromBridge();
+        }
+        
+        if(parsed.reset_close){
+          restartFromModal();
+        }
+         if (parsed.prediction_run) {
+          if (!bridgePredictionStartRequested && !isRunning) {
+            bridgePredictionStartRequested = true;
+            startDetection();
+          }
+        } else {
+          bridgePredictionStartRequested = false;
+          stopPradictionLive();
+        }
+      });
+
+      if (bridge.defect_signal) {
+        bridge.defect_signal.connect((data) => {
+          const defect = JSON.parse(data);
+
+          let imgSrc = defect.image_path.replace(/\\/g, "/");
+          if (!imgSrc.startsWith("file:///")) {
+            imgSrc = "file:///" + imgSrc;
+          }
+
+          defectHistory.unshift({
+            time: defect.defect_type || "DEFECT",
+            src: imgSrc,
+            raw_path: defect.raw_path
+          });
+
+          renderDefectThumbs();
+
+          currentModalIndex = 0;
+          updateModalImage();
+
+          // Show only the single latest defect — hide navigation arrows
+          document.getElementById("prevDefect").style.display = "none";
+          document.getElementById("nextDefect").style.display = "none";
+
+          // Hide Cancel during live defect alert (only Reset shown)
+          const cancelBtnLive = document.getElementById("modalCancelBtn");
+          if (cancelBtnLive) cancelBtnLive.style.display = "none";
+
+          // Show Restart button (not Close) for live defect alert
+          const alertBtn = document.getElementById("modalRestartBtn");
+          if (alertBtn) {
+            alertBtn.innerHTML = '<i class="fas fa-rotate-right"></i> Reset';
+            alertBtn.onclick = restartFromModal;
+          }
+
+          const title = document.querySelector("#defectModal .modal-head-title");
+          if (title) {
+            title.textContent = `Defect Detected - ${defect.defect_type}`;
+          }
+
+          const modal = document.getElementById("defectModal");
+          if (modal) modal.style.display = "flex";
+
+          document.getElementById("statusLabel").textContent = "DEFECT STOPPED";
+
+          stopUptime();
+          setUIState(false);
+
+          showToast(`⚠️ Defect Detected: ${defect.defect_type}`, 5000, "error");
+        });
+      }
+
+      // 🔥 ADD THIS BELOW counts_signal
+      if (bridge.storage_signal) {
+        bridge.storage_signal.connect((data) => {
+          try {
+            const parsed = JSON.parse(data);
+
+            const used = parsed?.data?.used_percent ?? 0;
+            const free = parsed?.data?.free_percent ?? 0;
+
+            const el = document.getElementById("storageLabel");
+            if (el) {
+              el.textContent = `Used: ${used}% | Free: ${free}%`;
+            }
+
+          } catch (err) {
+            console.error("Storage parse error:", err);
+          }
+        });
+      }
+    }
+    } else {
+      showToast("⚠️ No Qt Bridge - Using Laptop Webcam", 4000, "warning");
+    }
+
+    // Load dropdowns (jobs + thresholds) from bridge, then restore saved config
+    await loadDropdownData();
+    // await loadDefectImagesFromBridge();
+  });
+
+  renderDefectThumbs();
+  resetToInitialState();
+
+//   const jobIdInput = document.getElementById("jobIdInput");
+//   const thresholdInput = document.getElementById("thresholdInput");
+
+//   // Enable OK button check
+//   jobIdInput.addEventListener("change", checkCanConfirm);
+//   thresholdInput.addEventListener("input", checkCanConfirm);
+
+const jobIdInput = document.getElementById("jobIdInput");
+const thresholdInput = document.getElementById("thresholdInput");
+
+// Enable OK button check
+jobIdInput.addEventListener("change", async () => {
+  await updateThresholdFromSelectedJob();
+});
+
+thresholdInput.addEventListener("input", checkCanConfirm);
+});
+// document.addEventListener("DOMContentLoaded", () => {
+//   loadDefectImagesFromBridge();
+// });
+
+const USER_CONFIG_KEY = "userConfig"; // localStorage key (fallback)
+const USER_CONFIG_DEFAULTS = { jobId: "", threshold: "" };
+
+/**
+ * Populate the two input fields from saved config.
+ * Called once on DOMContentLoaded (after bridge is ready).
+ */
+// async function populateInputsFromConfig() {
+
+//   // const cfg = await readUserConfig();
+
+//   const jobInput = document.getElementById("jobIdInput");
+//   const thresholdInput = document.getElementById("thresholdInput");
+
+//   if (!jobInput || !thresholdInput) return;
+
+//   // jobIdInput is a <select> — only set if the option exists
+//   if (cfg.jobId) {
+//     const matchingOption = [...jobInput.options].find(
+//       (o) => o.value === cfg.jobId,
+//     );
+//     if (matchingOption) {
+//       jobInput.value = cfg.jobId;
+//     } else {
+//       // Option not loaded yet (async job list). Store for deferred assignment.
+//       jobInput.dataset.pendingValue = cfg.jobId;
+//     }
+//   }
+
+//   // thresholdInput is a plain text/number input
+//   if (cfg.threshold) {
+//     thresholdInput.value = cfg.threshold;
+//   }
+
+//   checkCanConfirm();
+
+//   if (cfg.jobId || cfg.threshold) {
+//     showToast(
+//       `📂 Config loaded — Job: ${cfg.jobId || "—"} | Threshold: ${cfg.threshold || "—"}`,
+//       3000,
+//     );
+//   }
+// }
+
+/**
+ * Debounce helper — prevents flooding the bridge on every keystroke.
+ */
+function debounce(fn, delay) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
+
+function callBridgeSlot(slotName, ...args) {
+  return new Promise((resolve, reject) => {
+    if (!bridge || typeof bridge[slotName] !== "function") {
+      resolve(null);
+      return;
+    }
+
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+
+    const timeout = setTimeout(() => {
+      if (!settled) reject(new Error(`${slotName} bridge call timed out`));
+    }, 15000);
+
+    try {
+      const result = bridge[slotName](...args, (value) => {
+        clearTimeout(timeout);
+        finish(value);
+      });
+
+      if (result !== undefined) {
+        clearTimeout(timeout);
+        if (result && typeof result.then === "function") {
+          result.then(finish).catch(reject);
+        } else {
+          finish(result);
+        }
+      }
+    } catch (err) {
+      clearTimeout(timeout);
+      reject(err);
+    }
+  });
+}
+
+// ─── Fetch Job IDs & Thresholds from Bridge ─────────────────────────
+async function loadDropdownData() {
+  try {
+    let jobs = [];
+    let thresholds = [];
+    let presetJobId = "";
+    let presetThreshold = "";
+
+    // Primary: Qt bridge → bridge.current_job_id()
+    if (bridge && typeof bridge.current_job_id === "function") {
+      try {
+        const raw = await bridge.current_job_id();
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          // alert(parsed.data.jobs);
+          jobs = parsed?.data?.jobs ?? [];
+          thresholds = parsed?.data?.thresholds ?? [];
+          presetJobId = String(parsed?.job_id ?? "");
+          presetThreshold = String(parsed?.threshold ?? "");
+        }
+      } catch (e) {
+        console.warn("[Dropdown] Bridge current_job_id failed:", e);
+      }
+    }
+
+    // ── Populate Job ID <select> ──────────────────────────────────────
+    const jobSelect = document.getElementById("jobIdInput");
+    jobSelect.innerHTML =
+      '<option value="" disabled selected hidden>Select Job ID</option>';
+    jobs.forEach((job) => {
+      const option = document.createElement("option");
+      option.value = job;
+      option.textContent = job;
+      jobSelect.appendChild(option);
+    });
+
+    // ── Override THRESHOLD_SUGGESTIONS with bridge values ─────────────
+    if (thresholds.length > 0) {
+      THRESHOLD_SUGGESTIONS.length = 0;
+      thresholds.forEach((t) => THRESHOLD_SUGGESTIONS.push(String(t)));
+    }
+
+    // ── Auto-fill & disable when bridge provides preset values ─────────
+    const thresholdInput = document.getElementById("thresholdInput");
+
+    if (presetJobId) {
+      // Select the matching option in the dropdown
+      const match = [...jobSelect.options].find((o) => o.value === presetJobId);
+
+      if (match) {
+        jobSelect.value = presetJobId;
+      }
+      if (presetThreshold) {
+        thresholdInput.value = presetThreshold;
+      }
+
+      if (match && presetThreshold) {
+        // Lock the dropdown — value is set by the system
+        jobSelect.disabled = true;
+        jobSelect.style.opacity = "0.6";
+        jobSelect.style.cursor = "not-allowed";
+
+        thresholdInput.disabled = true;
+        thresholdInput.style.opacity = "0.6";
+        thresholdInput.style.cursor = "not-allowed";
+
+        currentThreshold = presetThreshold;
+      }
+
+      // Mirror into currentJobId so confirmConfig works immediately
+      currentJobId = presetJobId;
+      const label = document.getElementById("jobIdLabel");
+      if (label) label.textContent = presetJobId;
+    }
+
+    // If both preset values are present, treat config as already confirmed
+    // if (presetJobId && presetThreshold) {
+    //   document.getElementById("okBtn").disabled = true;
+    //   document.getElementById("startBtn").disabled = false;
+    //   showToast(
+    //     `🔒 Auto-configured — Job: ${presetJobId} | Threshold: ${presetThreshold}`,
+    //     4000,
+    //   );
+    //   addLog(
+    //     `[Bridge] Auto-config applied → Job: ${presetJobId}, Threshold: ${presetThreshold}`,
+    //   );
+    // } else {
+    //   checkCanConfirm();
+    // }
+    if (presetJobId && presetThreshold) {
+      document.getElementById("okBtn").disabled = true;
+      document.getElementById("startBtn").disabled = false;
+      showToast(
+        `🔒 Auto-configured — Job: ${presetJobId} | Threshold: ${presetThreshold}`,
+        4000,
+      );
+      addLog(
+        `[Bridge] Auto-config applied → Job: ${presetJobId}, Threshold: ${presetThreshold}`,
+      );
+    } else {
+      if (jobSelect.value) {
+        await updateThresholdFromSelectedJob();
+      }
+      checkCanConfirm();
+    }
+  } catch (error) {
+    console.error("[Dropdown] loadDropdownData error:", error);
+  }
+}
+
+async function loadDefectImagesFromBridge() {
+  try {
+    if (!bridge || typeof bridge.get_defect_images !== "function") {
+      console.warn("Bridge not available");
+      return;
+    }
+
+    const raw = await bridge.get_defect_images();
+    const parsed = JSON.parse(raw);
+
+    const images = Array.isArray(parsed?.images) ? parsed.images : [];
+
+    defectHistory = [];
+
+    images.forEach((item) => {
+      if (!item) return;
+
+      // Bridge now returns objects: { src, raw_path }
+      // Fallback: support plain string paths from older bridge versions
+      const srcRaw = typeof item === "object" ? item.src : item;
+      const rawRaw = typeof item === "object" ? item.raw_path : null;
+
+      if (!srcRaw) return;
+
+      // Normalize display path to file:/// URL
+      let imgSrc = srcRaw.replace(/\\/g, "/");
+      if (!imgSrc.startsWith("file:///")) {
+        imgSrc = "file:///" + imgSrc;
+      }
+
+      // Normalize raw path to file:/// URL
+      let raw_path = "";
+      if (rawRaw) {
+        // Python already computed the correct raw path - use it directly
+        raw_path = rawRaw.replace(/\\/g, "/");
+        if (!raw_path.startsWith("file:///")) {
+          raw_path = "file:///" + raw_path;
+        }
+      } else {
+        // Fallback: derive raw_path from the original src string (before file:/// prefix)
+        // to avoid double-replacing the folder name
+        const normalized = srcRaw.replace(/\\/g, "/");
+        raw_path =
+          "file:///" +
+          normalized
+            .replace("/defect/", "/defect_raw/")
+            .replace(/\/defect_([^/]+\.jpg)$/i, "/raw_$1")
+            .replace(/\.jpg$/i, ".bmp");
+      }
+
+      console.log("[DefectLoad] src →", imgSrc);
+      console.log("[DefectLoad] raw →", raw_path);
+
+      defectHistory.push({ time: "", src: imgSrc, raw_path });
+    });
+
+    console.log("✅ Defect images loaded:", defectHistory.length);
+    renderDefectThumbs();
+
+  } catch (err) {
+    console.error("❌ Failed loading defect images:", err);
+  }
+}
+// count add ------------------------------------------
+async function loadCountsFromBridge() {
+  try {
+    console.log("🔥 loadCountsFromBridge called");
+    console.log("currentJobId =", currentJobId);
+
+    if (!bridge || typeof bridge.get_counts !== "function") {
+      console.warn("Counts API not available");
+      return;
+    }
+
+    const raw = await bridge.get_counts(currentJobId);
+    console.log("raw from bridge =", raw);
+
+    const parsed = JSON.parse(raw);
+    console.log("parsed =", parsed);
+
+    inspected = parsed.inspected || 0;
+    good = parsed.good || 0;
+    bad = parsed.defective || 0;
+
+    // console.log("inspected =", inspected);
+    // console.log("good =", good);
+    // console.log("bad =", bad);
+
+    updateCounters();
+
+    console.log("✅ Counts Loaded", parsed);
+  } catch (err) {
+    console.error("❌ Failed to load counts:", err);
+  }
+}
+
+// ─── Side Menu Control ──────────────────────────────────────────────
+function disableSideMenu() {
+  const menuItems = [
+    document.getElementById("menuDashboard"),
+    document.getElementById("menuReport"),
+    document.getElementById("menuController"),
+    document.getElementById("menuTraining"),
+    document.getElementById("menuSettings"),
+    document.getElementById("jobIdInput"),
+    document.getElementById("thresholdInput"),
+  ];
+
+  menuItems.forEach((item) => {
+    if (item) {
+      item.style.pointerEvents = "none";
+      item.style.opacity = "0.5";
+      item.style.cursor = "not-allowed";
+    }
+  });
+}
+
+function enableSideMenu() {
+  const menuItems = [
+    document.getElementById("menuDashboard"),
+    document.getElementById("menuReport"),
+    document.getElementById("menuController"),
+    document.getElementById("menuTraining"),
+    document.getElementById("menuSettings"),
+    document.getElementById("jobIdInput"),
+    document.getElementById("thresholdInput"),
+  ];
+
+  menuItems.forEach((item) => {
+    if (item) {
+      item.style.pointerEvents = "auto";
+      item.style.opacity = "1";
+      item.style.cursor = "pointer";
+    }
+  });
+}
+
+// ─── Enable OK button ───────────────────────────────────────────────
+function checkCanConfirm() {
+  const jobId = document.getElementById("jobIdInput").value.trim();
+  const threshold = document.getElementById("thresholdInput").value.trim();
+  document.getElementById("okBtn").disabled = !(jobId && threshold);
+}
+
+function syncCurrentConfigFromInputs() {
+  const jobInput = document.getElementById("jobIdInput");
+  const thresholdInput = document.getElementById("thresholdInput");
+
+  const jobId = jobInput ? jobInput.value.trim() : "";
+  const threshold = thresholdInput ? thresholdInput.value.trim() : "";
+
+  if (jobId) currentJobId = jobId;
+  if (threshold) currentThreshold = threshold;
+
+  return {
+    jobId: currentJobId,
+    threshold: currentThreshold,
+  };
+}
+
+// ─── Confirm Configuration ──────────────────────────────────────────
+async function updateThresholdFromSelectedJob() {
+  try {
+    const jobSelect = document.getElementById("jobIdInput");
+    const thresholdInput = document.getElementById("thresholdInput");
+
+    const selectedJob = jobSelect.value?.trim();
+
+    if (!selectedJob) {
+      thresholdInput.value = "";
+      currentThreshold = "";
+      checkCanConfirm();
+      return;
+    }
+
+    if (!bridge || typeof bridge.get_threshold_by_job !== "function") {
+      console.warn("get_threshold_by_job bridge function not available");
+      checkCanConfirm();
+      return;
+    }
+
+    const raw = await bridge.get_threshold_by_job(selectedJob);
+    const parsed = JSON.parse(raw);
+
+    if (parsed.ok) {
+      thresholdInput.value = parsed.threshold ? String(parsed.threshold) : "";
+      currentThreshold = parsed.threshold ? String(parsed.threshold) : "";
+    } else {
+      thresholdInput.value = "";
+      currentThreshold = "";
+    }
+
+    checkCanConfirm();
+  } catch (err) {
+    console.error("❌ Failed to update threshold for selected job:", err);
+  }
+}
+function confirmConfig() {
+  const { jobId, threshold } = syncCurrentConfigFromInputs();
+
+  if (!jobId || !threshold) {
+    showToast("❌ Please select Job ID and enter Threshold", 3000, "error");
+    return;
+  }
+
+  saveUserConfigToBridge(jobId, threshold);
+
+  // ✅ When OK clicked, load counts based on selected job id
+  loadCountsFromBridge();
+
+  loadDefectImagesFromBridge();
+  document.getElementById("jobIdLabel").textContent = jobId;
+
+  const jobSelect = document.getElementById("jobIdInput");
+  const thresholdInput = document.getElementById("thresholdInput");
+
+  jobSelect.disabled = true;
+  jobSelect.style.opacity = "0.6";
+  jobSelect.style.cursor = "not-allowed";
+
+  thresholdInput.disabled = true;
+  thresholdInput.style.opacity = "0.6";
+  thresholdInput.style.cursor = "not-allowed";
+
+  showToast(
+    `✅ Configuration Confirmed!<br>Job: ${jobId} | Threshold: ${threshold}`,
+    4000,
+  );
+  addLog(`Configuration Confirmed → Job: ${jobId}, Threshold: ${threshold}`);
+
+  document.getElementById("startBtn").disabled = false;
+  document.getElementById("okBtn").disabled = true;
+}
+
+// ─── Reset Configuration ────────────────────────────────────────────
+function resetConfig() {
+  bridge.resetUserConfig();
+
+  const jobSelect = document.getElementById("jobIdInput");
+  const thresholdInput = document.getElementById("thresholdInput");
+
+  jobSelect.value = "";
+  thresholdInput.value = "";
+  currentJobId = "";
+  currentThreshold = "";
+
+  // ✅ Reset counts to 0 when Reset clicked
+  inspected = 0;
+  good = 0;
+  bad = 0;
+  updateCounters();
+
+  defectHistory = [];
+  currentModalIndex = -1;
+  renderDefectThumbs();
+
+  document.getElementById("jobIdLabel").textContent = "—";
+
+  jobSelect.disabled = false;
+  jobSelect.style.opacity = "1";
+  jobSelect.style.cursor = "pointer";
+
+  thresholdInput.disabled = false;
+  thresholdInput.style.opacity = "1";
+  thresholdInput.style.cursor = "pointer";
+  thresholdInput.style.background = "#ffffff";
+  thresholdInput.style.color = "";
+
+  enableSideMenu();
+
+  document.getElementById("startBtn").disabled = true;
+  document.getElementById("okBtn").disabled = true;
+
+  showToast("Configuration Reset", 2500);
+  addLog("Configuration Reset");
+}
+
+// ─── Reset to Initial State ─────────────────────────────────────────
+function resetToInitialState() {
+  isRunning = false;
+  pradictionlive = false;
+  
+  // stopAllCameras();
+  stopPradictionLive();
+  document.getElementById("startBtn").disabled = true;
+  document.getElementById("stopBtn").disabled = true;
+  document.getElementById("okBtn").disabled = true;
+  document.getElementById("resetConfigBtn").disabled = false;
+
+  document.getElementById("jobIdInput").disabled = false;
+  document.getElementById("thresholdInput").disabled = false;
+
+  enableSideMenu(); // Ensure menu is enabled initially
+
+  hideCameraFeed();
+  document.getElementById("statusLabel").textContent = "STANDBY";
+  document.getElementById("jobIdLabel").textContent = "—";
+  inspected = 0;
+  good = 0;
+  bad = 0;
+  updateCounters();
+}
+
+// ─── Camera Helpers ─────────────────────────────────────────────────
+function showCameraFeed() {
+  const videoFeed = document.getElementById("videoFeed");
+  const noFeed = document.getElementById("noFeed");
+  const liveBadge = document.getElementById("liveBadge");
+  const cameraWrap = document.querySelector(".camera-wrap");
+
+  // Make sure container is visible
+  if (cameraWrap) cameraWrap.style.display = "block";
+
+  disableSideMenu(); // Disable menu after start
+
+  noFeed.style.display = "none";
+  videoFeed.style.display = "block"; // Show video element initially
+  if (liveBadge) liveBadge.style.display = "flex";
+
+  // Remove any previous qtFrameImg so we start clean
+  const existingQtImg = document.getElementById("qtFrameImg");
+  if (existingQtImg) existingQtImg.remove();
+}
+
+function hideCameraFeed() {
+  const videoFeed = document.getElementById("videoFeed");
+  const noFeed = document.getElementById("noFeed");
+  const liveBadge = document.getElementById("liveBadge");
+
+  noFeed.style.display = "flex";
+  videoFeed.style.display = "none";
+  if (liveBadge) liveBadge.style.display = "none";
+
+  // Remove Qt frame image completely when hiding
+  const existingQtImg = document.getElementById("qtFrameImg");
+  if (existingQtImg) existingQtImg.remove();
+}
+
+// function stopAllCameras() {
+//   if (currentStream) {
+//     currentStream.getTracks().forEach((track) => track.stop());
+//     currentStream = null;
+//   }
+
+//   // Also stop Qt bridge camera if available
+//   if (bridge && typeof bridge.stopCamera === "function") {
+//     try {
+//       bridge.stopCamera();
+//     } catch (e) {
+//       console.warn("Bridge stopCamera failed:", e);
+//     }
+//   }
+
+//   hideCameraFeed(); // This will now properly clean up
+// }
+
+// ─── Start Laptop Webcam (Fallback) ─────────────────────────────────
+async function startLaptopWebcam() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" },
+    });
+    currentStream = stream;
+
+    const videoElement = document.getElementById("videoFeed");
+    videoElement.srcObject = stream;
+    await videoElement.play();
+
+    showToast("Laptop Webcam Started", 2500);
+    return true;
+  } catch (err) {
+    console.error("Webcam error:", err);
+    showToast(
+      "❌ Could not access laptop camera. Check permissions.",
+      4000,
+      "error",
+    );
+    return false;
+  }
+}
+
+// ─── Start Detection ────────────────────────────────────────────────
+async function startDetection() {
+  console.log("🔥 startDetection called");
+  console.log("currentJobId =", currentJobId);
+  console.log("currentThreshold =", currentThreshold);
+
+  if (isRunning) {
+    showToast("Detection is already running", 2500, "warning");
+    return;
+  }
+
+  const { jobId, threshold } = syncCurrentConfigFromInputs();
+
+  if (!jobId || !threshold) {
+    showToast("❌ Please click OK first", 3000, "error");
+    return;
+  }
+
+  showCameraFeed();
+  console.log("🔥 calling loadCountsFromBridge...");
+  loadCountsFromBridge();
+  document.getElementById("statusLabel").textContent = "ACTIVE";
+
+  setUIState(true);
+  startUptime();
+
+  addLog(`Detection Started - Job ID: ${currentJobId}`);
+
+  if (bridge && typeof bridge.startCamera === "function") {
+    try {
+      const response = await callBridgeSlot("startCamera", "prediction");
+      if (response === "Machine OFF") {
+        alert("Machine Not ON");
+        stopDetection();
+        return;
+      }
+      if (response !== "OK" && response !== "Camera Already Running") {
+        showToast(response || "Camera not available", 4000, "error");
+        stopDetection();
+        return;
+      }
+      pradictionlive = true;
+      showToast("Industrial Camera Started via Bridge", 2500);
+
+
+      if (bridge.frame_signal && !bridge.frame_signal._connected) {
+        bridge.frame_signal.connect((base64Image) => {
+          updateVideoFeedFromBase64(base64Image);
+        });
+        bridge.frame_signal._connected = true;
+      }
+    } catch (e) {
+      console.error(e);
+      const webcamStarted = await startLaptopWebcam();
+      if (!webcamStarted) stopDetection();
+    }
+  } else {
+    const webcamStarted = await startLaptopWebcam();
+    if (!webcamStarted) stopDetection();
+  }
+
+
+  // // Demo defect simulation
+  // demoDefectInterval = setInterval(() => {
+  //   inspected++;
+  //   const isDefect = Math.random() < 0.3;
+
+  //   if (isDefect) {
+  //     bad++;
+  //     const randomSrc = [Math.floor(Math.random())];
+
+  //     defectHistory.unshift({
+  //       time: new Date().toLocaleTimeString([], {
+  //         hour: "2-digit",
+  //         minute: "2-digit",
+  //       }),
+  //       src: randomSrc,
+  //     });
+
+  //     if (defectHistory.length > 10) defectHistory.pop();
+
+  //     addLog('<span style="color:#ef233c">⚠️ DEFECT DETECTED</span>');
+  //     renderDefectThumbs();
+  //   } else {
+  //     good++;
+  //   }
+  //   updateCounters();
+  // }, 5000);
+}
+
+// ─── Stop Detection ─────────────────────────────────────────────────
+function stopDetection() {
+  if (!isRunning) return;
+  pradictionlive = false;
+
+  // Stop everything
+  // stopAllCameras();
+
+  if (currentStream) {
+    currentStream.getTracks().forEach((track) => track.stop());
+    currentStream = null;
+  }
+
+  // Also stop Qt bridge camera if available
+  if (bridge && typeof bridge.stopCamera === "function") {
+    try {
+      bridge.stopCamera();
+    } catch (e) {
+      console.warn("Bridge stopCamera failed:", e);
+    }
+  }
+
+  hideCameraFeed(); // This will now properly clean up
+
+  stopUptime();
+  setUIState(false);
+
+  document.getElementById("statusLabel").textContent = "STANDBY";
+
+  // IMPORTANT: Re-enable side menu when stopping
+  enableSideMenu();
+
+  // showToast("🛑 Detection Stopped", 3000);
+  addLog("Detection Stopped");
+}
+
+// ─── UI State ───────────────────────────────────────────────────────
+function stopPradictionLive() {
+  if (!isRunning && !pradictionlive) return;
+
+  pradictionlive = false;
+
+  if (currentStream) {
+    currentStream.getTracks().forEach((track) => track.stop());
+    currentStream = null;
+  }
+
+  // Also stop Qt bridge camera if available
+  if (bridge && typeof bridge.camera_stop === "function") {
+    try {
+      bridge.camera_stop();
+    } catch (e) {
+      console.warn("Bridge stopCamera failed:", e);
+    }
+  }
+
+  hideCameraFeed(); // This will now properly clean up
+
+  stopUptime();
+  setUIState(false);
+
+  document.getElementById("statusLabel").textContent = "STANDBY";
+
+  // IMPORTANT: Re-enable side menu when stopping
+  enableSideMenu();
+
+  showToast("Detection Stopped", 3000);
+  addLog("Detection Stopped");
+}
+
+function setUIState(running) {
+  isRunning = running;
+  if (!running) pradictionlive = false;
+  const startBtn = document.getElementById("startBtn");
+  const stopBtn = document.getElementById("stopBtn");
+  const jobSelect = document.getElementById("jobIdInput");
+  const thresholdInput = document.getElementById("thresholdInput");
+  const okBtn = document.getElementById("okBtn");
+  const resetConfigBtn = document.getElementById("resetConfigBtn");
+
+  if (running) {
+    // Detection is running: only Stop is active, Reset is locked
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+    jobSelect.disabled = true;
+    thresholdInput.disabled = true;
+    okBtn.disabled = true;
+    resetConfigBtn.disabled = true;   // Reset disabled while running
+  } else {
+    // Detection stopped: Start is disabled until Reset → re-configure
+    startBtn.disabled = !(currentJobId && currentThreshold);
+    stopBtn.disabled = true;
+    jobSelect.disabled = true;
+    thresholdInput.disabled = true;
+    okBtn.disabled = true;
+    resetConfigBtn.disabled = false;  // Reset enabled so user can re-configure
+  }
+}
+
+// ─── Counters & Uptime ──────────────────────────────────────────────
+function updateCounters() {
+  // console.log("🔥 updateCounters called");
+  // console.log("setting inspectedCount =", inspected);
+  // console.log("setting goodCount =", good);
+  // console.log("setting badCount =", bad);
+
+  document.getElementById("inspectedCount").textContent = inspected ?? 0;
+  document.getElementById("goodCount").textContent = good ?? 0;
+  document.getElementById("badCount").textContent = bad ?? 0;
+}
+function startUptime() {
+  sessionStart = Date.now();
+  uptimeTimer = setInterval(() => {
+    const s = Math.floor((Date.now() - sessionStart) / 1000);
+    document.getElementById("uptimeVal").textContent =
+      `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  }, 1000);
+}
+
+function stopUptime() {
+  if (uptimeTimer) clearInterval(uptimeTimer);
+  document.getElementById("uptimeVal").textContent = "0:00";
+}
+
+// ─── Qt Frame Display ───────────────────────────────────────────────
+function updateVideoFeedFromBase64(base64Image) {
+  let feedImg = document.getElementById("qtFrameImg");
+  const videoContainer = document.querySelector(".camera-wrap");
+  const videoEl = document.getElementById("videoFeed");
+
+  if (!feedImg) {
+    // Create Qt image only when first frame arrives
+    feedImg = document.createElement("img");
+    feedImg.id = "qtFrameImg";
+    feedImg.style.cssText = `
+      position: absolute;
+      inset: 0;
+      width: 100%; 
+      height: 100%; 
+      object-fit: contain; 
+      background: #000;
+      border-radius: 6px;
+      display: block;
+      z-index: 2;
+    `;
+
+    // Hide the <video> element when using Qt frames
+    if (videoEl) videoEl.style.display = "none";
+
+    videoContainer.appendChild(feedImg);
+  }
+
+  // Update the source
+  feedImg.src = "data:image/jpeg;base64," + base64Image;
+}
+
+// ─── Defect Functions ───────────────────────────────────────────────
+function renderDefectThumbs() {
+  const slider = document.getElementById("defectsSlider");
+  if (!slider) return;
+
+  slider.innerHTML = "";
+
+  if (defectHistory.length === 0) {
+    const empty = document.createElement("div");
+    empty.style.cssText =
+      "padding: 30px 20px; color: #888; font-style: italic; text-align: center; width: 100%;";
+    empty.textContent = "No defects detected yet";
+    slider.appendChild(empty);
+    return;
+  }
+
+  defectHistory.forEach((defect, index) => {
+    const thumbWrapper = document.createElement("div");
+    thumbWrapper.className = "defect-thumb";
+    thumbWrapper.style.cssText = `
+      width: 118px; height: 88px; flex-shrink: 0; border-radius: 8px;
+      overflow: hidden; cursor: pointer; border: 2px solid #444;
+      position: relative; box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+      transition: all 0.25s ease;
+    `;
+
+    thumbWrapper.innerHTML = `
+      <img src="${defect.src}" style="width:100%;height:100%;object-fit:cover;margin-left:10px;margin-right:10px;display:block;" alt="Defect">
+      <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.85));color:white;font-size:0.78rem;padding:6px 8px 5px;text-align:center;font-weight:500;">
+        ${defect.time || "DEFECT"}
+      </div>
+    `;
+
+    thumbWrapper.onclick = () => openDefectModal(index);
+    thumbWrapper.onmouseenter = () =>
+      (thumbWrapper.style.borderColor = "#ef233c");
+    thumbWrapper.onmouseleave = () => (thumbWrapper.style.borderColor = "#444");
+
+    slider.appendChild(thumbWrapper);
+  });
+}
+
+function openDefectModal(index) {
+  currentModalIndex = index;
+
+  const modal = document.getElementById("defectModal");
+  if (!modal) return;
+
+  // Restore arrows
+  document.getElementById("prevDefect").style.display = "";
+  document.getElementById("nextDefect").style.display = "";
+
+  // Show Cancel button (hidden during live defect alert)
+  const cancelBtn = document.getElementById("modalCancelBtn");
+  if (cancelBtn) {
+    cancelBtn.style.display = "";
+    cancelBtn.onclick = closeDefectModal;
+  }
+
+  // OK button → append training image
+  const btn = document.getElementById("modalRestartBtn");
+  if (btn) {
+    btn.innerHTML = "OK";
+
+    btn.onclick = function () {
+      try {
+        const defect = defectHistory[currentModalIndex];
+
+        console.log("[AppendTraining] currentModalIndex =", currentModalIndex);
+        console.log("[AppendTraining] defect =", defect);
+
+        if (!defect) {
+          alert("No defect selected");
+          return;
+        }
+
+        if (!defect.raw_path) {
+          alert("Raw image path is missing for this defect");
+          return;
+        }
+
+        // Strip file:/// prefix before sending to Python (os.path.exists needs a plain path)
+        let imgPath = defect.raw_path.replace(/^file:\/{2,3}/, "");
+
+        console.log("[AppendTraining] sending path →", imgPath);
+
+        bridge.appendTraining(imgPath).then((res) => {
+          console.log("[AppendTraining] result =", res);
+
+          const parsed = JSON.parse(res);
+
+          if (parsed.ok) {
+            // alert("Training image appended successfully");
+            closeDefectModal();
+          } else {
+            alert("Failed: " + parsed.message);
+          }
+        }).catch((err) => {
+          console.error("[AppendTraining] bridge error:", err);
+          alert("Bridge call failed: " + err);
+        });
+
+      } catch (err) {
+        console.error("[AppendTraining] error:", err);
+        alert("Unexpected error: " + err.message);
+      }
+    };
+  }
+
+  updateModalImage();
+  modal.style.display = "flex";
+}
+
+
+function updateModalImage() {
+  if (currentModalIndex < 0 || currentModalIndex >= defectHistory.length)
+    return;
+  const defect = defectHistory[currentModalIndex];
+  const imgElement = document.getElementById("defectModalImage");
+  const positionElement = document.getElementById("defectModalPosition");
+
+  if (imgElement) imgElement.src = defect.src;
+  if (positionElement) {
+    positionElement.textContent = `${currentModalIndex + 1} / ${defectHistory.length} — ${defect.time || "Sample"}`;
+  }
+}
+
+function changeDefect(direction) {
+  currentModalIndex += direction;
+  if (currentModalIndex < 0) currentModalIndex = defectHistory.length - 1;
+  if (currentModalIndex >= defectHistory.length) currentModalIndex = 0;
+  updateModalImage();
+}
+
+function closeDefectModal() {
+  const modal = document.getElementById("defectModal");
+  if (modal) modal.style.display = "none";
+}
+
+// function closeDefectModal() {
+//   const modal = document.getElementById("defectModal");
+//   if (modal) modal.style.display = "none";
+
+//   document.getElementById("startBtn").disabled = false;
+//   document.getElementById("stopBtn").disabled = true;
+//   document.getElementById("resetConfigBtn").disabled = false;
+//   document.getElementById("statusLabel").textContent = "STANDBY";
+
+//   // enableSideMenu();
+// }
+
+// ─── Restart from Defect Modal ───────────────────────────────────────
+function restartFromModal() {
+  // Close the modal
+  const modal = document.getElementById("defectModal");
+  if (modal) modal.style.display = "none";
+
+  // Restore nav arrows for future thumbnail-click opens
+  document.getElementById("prevDefect").style.display = "";
+  document.getElementById("nextDefect").style.display = "";
+
+  // Reset running flag so startDetection() can proceed
+  isRunning = false;
+  enableSideMenu();
+
+  if (bridge && typeof bridge.turn_off_warning === "function") {
+    try {
+      bridge.turn_off_warning();
+    } catch (e) {
+      console.error("Error stopping camera via bridge:", e);
+    }
+  }
+  // Restart detection immediately
+  // startDetection();
+}
+
+// function downloadDefectImage() {
+//   if (currentModalIndex < 0 || currentModalIndex >= defectHistory.length)
+//     return;
+//   const defect = defectHistory[currentModalIndex];
+//   const link = document.createElement("a");
+//   link.href = defect.src;
+//   link.download = `sliver_defect_${currentModalIndex + 1}_${Date.now()}.jpg`;
+//   document.body.appendChild(link);
+//   link.click();
+//   document.body.removeChild(link);
+//   showToast("✅ Defect image downloaded", 2500);
+// }
+
+// ─── Toast & Log ────────────────────────────────────────────────────
+function showToast(msg, ms = 3500, type = "success") {
+  const toast = document.getElementById("toast");
+  const toastMsg = document.getElementById("toastMessage");
+
+  toastMsg.innerHTML = msg;
+  if (type === "error") toast.style.background = "#ef233c";
+  else if (type === "warning") toast.style.background = "#f59e0b";
+  else toast.style.background = "#16a34a";
+
+  toast.style.display = "block";
+  requestAnimationFrame(() => toast.classList.add("show"));
+
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => {
+      toast.style.display = "none";
+    }, 300);
+  }, ms);
+}
+
+function addLog(msg) {
+  console.log(`[LOG ${new Date().toLocaleTimeString()}] ${msg}`);
+}
+
+// ─── Threshold Suggestions ──────────────────────────────────────────
+const THRESHOLD_SUGGESTIONS = [""];
+
+function filterSuggestions() {
+  const input = document.getElementById("thresholdInput");
+  const container = document.getElementById("thresholdSuggestionsDiv");
+  const val = input.value.toLowerCase().trim();
+
+  container.innerHTML = "";
+  const filtered = THRESHOLD_SUGGESTIONS.filter(
+    (s) => s.includes(val) || val === "",
+  );
+
+  filtered.forEach((s) => {
+    const div = document.createElement("div");
+    div.textContent = s;
+    div.onclick = () => {
+      input.value = s;
+      container.style.display = "none";
+      checkCanConfirm();
+    };
+    container.appendChild(div);
+  });
+
+  container.style.display = filtered.length > 0 ? "block" : "none";
+}
+
+function toggleSuggestions() {
+  const container = document.getElementById("thresholdSuggestionsDiv");
+  const input = document.getElementById("thresholdInput");
+
+  if (container.style.display === "block") {
+    container.style.display = "none";
+  } else {
+    filterSuggestions();
+    input.focus();
+  }
+}
+
+// Close suggestions when clicking outside
+document.addEventListener("click", function (e) {
+  const container = document.getElementById("thresholdSuggestionsDiv");
+  const wrapper = document.querySelector(".hybrid-threshold");
+  if (wrapper && !wrapper.contains(e.target)) {
+    container.style.display = "none";
+  }
+});
+
+// ─── Settings ───────────────────────────────────────────────────────
+// function openSettings() {
+//   document.getElementById("settingsModal").style.display = "flex";
+//   document.getElementById("modeDefault").checked = true;
+//   toggleManual();
+// }
+
+// function closeSettings() {
+//   document.getElementById("settingsModal").style.display = "none";
+// }
+
+// function toggleManual() {
+//   const isManual =
+//     document.querySelector('input[name="mode"]:checked')?.value === "manual";
+//   document.getElementById("manualControls").style.display = isManual
+//     ? "block"
+//     : "none";
+//   document.getElementById("defaultInfo").style.display = isManual
+//     ? "none"
+//     : "block";
+// }
+
+// function saveSettings() {
+//   closeSettings();
+//   showToast("Settings saved successfully");
+//   addLog("Settings updated.");
+// }
+
+// function switchTab(tabName) {
+//   document
+//     .querySelectorAll(".modal-tab")
+//     .forEach((tab) => tab.classList.remove("active"));
+//   document
+//     .querySelectorAll(".tab-content")
+//     .forEach((content) => content.classList.remove("active"));
+
+//   if (tabName === "detection") {
+//     document.querySelector(".modal-tab:first-child").classList.add("active");
+//     document.getElementById("detectionTab").classList.add("active");
+//   } else if (tabName === "threshold") {
+//     document.querySelector(".modal-tab:last-child").classList.add("active");
+//     document.getElementById("thresholdTab").classList.add("active");
+//   }
+// }
+
+// Modal outside click
+// document.getElementById("defectModal")?.addEventListener("click", (e) => {
+//   if (e.target === e.currentTarget) closeDefectModal();
+// });
+document.getElementById("settingsModal")?.addEventListener("click", (e) => {
+  if (e.target === e.currentTarget) closeSettings();
+});
+
+// defect image zoom
+const image = document.getElementById("defectModalImage");
+const viewer = document.getElementById("imageViewer");
+
+const zoomInBtn = document.getElementById("zoomInBtn");
+const zoomOutBtn = document.getElementById("zoomOutBtn");
+const resetBtn = document.getElementById("resetBtn");
+
+let zoomLevel = 1;
+const zoomStep = 0.2;
+const maxZoom = 5;
+const minZoom = 1;
+
+let posX = 0;
+let posY = 0;
+
+let startX = 0;
+let startY = 0;
+let isDragging = false;
+
+// ===================
+// APPLY TRANSFORM
+// ===================
+function updateTransform() {
+  image.style.transform = `translate3d(${posX}px, ${posY}px, 0) scale(${zoomLevel})`;
+}
+
+// ===================
+// RESET FUNCTION
+// ===================
+function resetView() {
+  zoomLevel = 1;
+  posX = 0;
+  posY = 0;
+  updateTransform();
+}
+
+// ===================
+// ZOOM IN
+// ===================
+zoomInBtn.onclick = () => {
+  if (zoomLevel < maxZoom) {
+    zoomLevel += zoomStep;
+    updateTransform();
+  }
+};
+
+// ===================
+// ZOOM OUT
+// ===================
+zoomOutBtn.onclick = () => {
+  if (zoomLevel > minZoom) {
+    zoomLevel -= zoomStep;
+
+    if (zoomLevel <= 1) {
+      resetView(); // ⭐ FIX
+      return;
+    }
+
+    updateTransform();
+  }
+};
+
+// ===================
+// RESET BUTTON
+// ===================
+resetBtn.onclick = resetView;
+
+// ===================
+// DRAG START
+// ===================
+viewer.addEventListener("mousedown", (e) => {
+  if (zoomLevel <= 1) return;
+
+  isDragging = true;
+  viewer.classList.add("dragging");
+
+  startX = e.clientX - posX;
+  startY = e.clientY - posY;
+});
+
+// ===================
+// DRAG MOVE
+// ===================
+window.addEventListener("mousemove", (e) => {
+  if (!isDragging) return;
+
+  posX = e.clientX - startX;
+  posY = e.clientY - startY;
+
+  updateTransform();
+});
+
+// ===================
+// DRAG END
+// ===================
+window.addEventListener("mouseup", () => {
+  isDragging = false;
+  viewer.classList.remove("dragging");
+});
+// mouse wheel scrool
+viewer.addEventListener("wheel", (e) => {
+  e.preventDefault();
+
+  const rect = viewer.getBoundingClientRect();
+
+  // mouse position inside viewer
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+
+  const scaleAmount = 0.1;
+
+  let newZoom =
+    e.deltaY < 0
+      ? zoomLevel + scaleAmount // scroll up
+      : zoomLevel - scaleAmount; // scroll down
+
+  // limit zoom
+  newZoom = Math.min(maxZoom, Math.max(minZoom, newZoom));
+
+  // stop if same zoom
+  if (newZoom === zoomLevel) return;
+
+  // 🔥 zoom towards mouse position
+  const zoomRatio = newZoom / zoomLevel;
+
+  posX = mouseX - (mouseX - posX) * zoomRatio;
+  posY = mouseY - (mouseY - posY) * zoomRatio;
+
+  zoomLevel = newZoom;
+
+  // auto reset when normal size
+  if (zoomLevel <= 1) {
+    resetView();
+    return;
+  }
+
+  updateTransform();
+});
+
+
+function saveUserConfigToBridge(jobId, threshold) {
+  if (!bridge || typeof bridge.saveUserConfig !== "function") {
+    console.warn("Bridge saveUserConfig not available");
+    return;
+  }
+
+  bridge.saveUserConfig(jobId, threshold, function (response) {
+
+    const result = JSON.parse(response);
+
+    if (result.status === "success") {
+      
+      console.log("🔥 Calling saveUserConfig", jobId, threshold);
+      console.log("🟢 PROCESS CONFIRMED");
+      console.log("Job:", result.data.jobId);
+      console.log("Threshold:", result.data.threshold);
+
+      showToast("✅ Process Confirmed", 3000);
+
+      addLog("PROCESS CONFIRMED ✅");
+
+    } else {
+      console.error("❌ Save Failed:", result.message);
+      showToast("❌ Save failed", 3000, "error");
+    }
+  });
+}
+
+
+
+
+// invoice
+
+
+  function waitForBridge(callback, retries = 10) {
+    if (window.bridge) {
+      callback();
+    } else if (retries > 0) {
+      setTimeout(() => waitForBridge(callback, retries - 1), 200);
+    } else {
+      showToast("Bridge not connected", 2000);
+    }
+  }

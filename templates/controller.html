@@ -1,0 +1,1071 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>TEXA – Controller</title>
+    <link rel="stylesheet" href="../static/css/all.min.css" />
+    <link rel="stylesheet" href="../static/css/controller.css" />
+    <link rel="stylesheet" href="../static/css/style.css" />
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <style>
+      .sw {
+        opacity: 1;
+      }
+      /* ── Signal & Light Controls list ── */
+      .signal-list {
+        display: flex;
+        flex-direction: column;
+      }
+      .signal-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 13px 20px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+        transition: background 0.15s;
+        cursor: default;
+      }
+      .signal-row:last-child {
+        border-bottom: none;
+      }
+      .signal-row:hover {
+        background: rgba(0, 0, 0, 0.025);
+      }
+      .signal-row-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .signal-dot {
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        display: inline-block;
+        margin-right: 15px;
+      }
+      .signal-name {
+        font-size: 0.92rem;
+        font-weight: 600;
+        color: #1e293b;
+        line-height: 1.2;
+      }
+      .signal-key {
+        font-size: 0.72rem;
+        color: #94a3b8;
+        font-family: monospace;
+        margin-top: 2px;
+      }
+      .signal-row-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      /* Right card control rows */
+      .signal-ctrl-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 13px 20px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      }
+      .signal-ctrl-row:last-child {
+        border-bottom: none;
+      }
+      .signal-ctrl-row:hover {
+        background: rgba(0, 0, 0, 0.025);
+      }
+      .signal-ctrl-name {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.92rem;
+        font-weight: 600;
+        color: #1e293b;
+      }
+      .signal-badge {
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        padding: 3px 9px;
+        border-radius: 20px;
+        min-width: 38px;
+        text-align: center;
+        transition:
+          background 0.2s,
+          color 0.2s;
+      }
+      .signal-badge.off {
+        background: #f1f5f9;
+        color: #94a3b8;
+      }
+      .signal-badge.on {
+        background: #dcfce7;
+        color: #16a34a;
+      }
+
+      /* ── Toggle switch explicit colors for signal control card ── */
+      #signalControlCard .sw {
+        position: relative;
+        display: inline-block;
+        width: 46px;
+        height: 26px;
+        flex-shrink: 0;
+        cursor: pointer;
+      }
+      #signalControlCard .sw input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+        position: absolute;
+      }
+      #signalControlCard .sw-track {
+        position: absolute;
+        inset: 0;
+        border-radius: 999px;
+        background: #cbd5e1;
+        transition: background 0.22s;
+      }
+      #signalControlCard .sw-track::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #ffffff;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+        transition: transform 0.22s;
+      }
+      #signalControlCard .sw input:checked ~ .sw-track {
+        background: #16a34a;
+      }
+      #signalControlCard .sw input:checked ~ .sw-track::after {
+        transform: translateX(20px);
+      }
+      #signalControlCard .sw.on .sw-track {
+        background: #16a34a;
+      }
+      #signalControlCard .sw.on .sw-track::after {
+        transform: translateX(20px);
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="app">
+      <!-- ═══ TOPBAR ═══ -->
+      <header>
+        <div class="logo-icon">
+          <a href="index.html">
+            <img src="../static/img/logo/logo.png" alt="" />
+          </a>
+        </div>
+        <div class="brand">
+          <div class="brand-name">Sliver Strip Detection</div>
+          <div class="brand-sub">Industrial Vision System</div>
+        </div>
+
+        <div class="header-pills">
+          <div class="pill">
+            <span
+              class="pill-dot"
+              id="jobColorDot"
+              style="background: #16a34a"
+            ></span>
+            <span class="pill-lbl">JOB ID</span>
+            <span class="pill-val" id="jobIdLabel">—</span>
+          </div>
+          <div class="pill">
+            <span class="pill-dot live" id="statusDot"></span>
+            <span class="pill-lbl">STATUS</span>
+            <span class="pill-val" id="statusLabel">STANDBY</span>
+          </div>
+          <div class="pill">
+            <span class="pill-lbl">STORAGE</span>
+            <span class="pill-val" id="storageLabel">Used: 0% | Free: 0%</span>
+          </div>
+          <!-- <div class="pill">
+          <span class="pill-lbl">DEFECTS</span>
+          <span class="pill-val" id="hdrDefects">0</span>
+        </div> -->
+
+          <!-- <div class="pill">
+          <span class="pill-lbl">ACCURACY</span>
+          <span class="pill-val">98.4%</span>
+        </div> -->
+        </div>
+
+        <div class="hdr-clock" id="clock">--:--:--</div>
+      </header>
+
+      <div class="body-wrap">
+        <!-- ═══ SIDEBAR ═══ -->
+        <aside>
+          <div class="sec-lbl">Menu</div>
+          <a href="index.html" class="nav-btn" id="menuDashboard">
+            <i class="fa-solid fa-gauge"></i> Dashboard
+          </a>
+          <div class="nav-btn" onclick="bridge?.goReport()" id="menuReport">
+            <i class="fas fa-file-lines"></i> Report
+          </div>
+          <a class="nav-btn active" href="controller.html">
+            <i class="fas fa-sliders"></i> Controller
+          </a>
+          <a href="training.html" class="nav-btn" id="menuTraining">
+            <i class="fas fa-graduation-cap"></i> Training
+          </a>
+          <a class="nav-btn" href="settings.html">
+            <i class="fas fa-gear"></i> Settings
+          </a>
+        </aside>
+
+        <!-- ═══ MAIN ═══ -->
+        <main class="ctrl-main">
+          <!-- ── PAGE HEADER ── -->
+          <div class="ctrl-page-header">
+            <div class="ctrl-page-header-left">
+              <div class="ctrl-page-icon">
+                <i class="fa-solid fa-sliders"></i>
+              </div>
+              <div>
+                <div class="ctrl-page-name">Controller Settings</div>
+                <div class="ctrl-page-sub">
+                  Connection, exposure &amp; I/O controls
+                </div>
+              </div>
+            </div>
+            <div class="ctrl-status-badge d-none" id="globalStatus">
+              <span class="ctrl-status-dot pulse"></span>
+              <span class="ctrl-status-text">Connecting…</span>
+            </div>
+            <div class="conn-refresh-row">
+              <button
+                class="prim-btn"
+                id="connRefreshBtn"
+                onclick="checkConnection()"
+              >
+                <i class="fa-solid fa-rotate-right"></i>Refresh
+              </button>
+            </div>
+          </div>
+
+          <!-- ── TOP ROW: Exposure + Connection ── -->
+          <div class="ctrl-grid-2">
+            <!-- ① EXPOSURE CARD -->
+            <div class="ctrl-card">
+              <div class="ctrl-card-head accent-blue">
+                <div class="ctrl-card-head-icon">
+                  <i class="fa-solid fa-camera"></i>
+                </div>
+                <div>
+                  <div class="ctrl-card-title">Exposure</div>
+                  <div class="ctrl-card-desc">Camera exposure time (µs)</div>
+                </div>
+              </div>
+              <div class="ctrl-card-body">
+                <label class="ctrl-field-label">Exposure Value (µs)</label>
+                <div class="ctrl-inline-row">
+                  <input
+                    type="number"
+                    id="exposureInput"
+                    class="ctrl-input"
+                    min="0"
+                    max="100000"
+                    step="1"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="e.g. 500"
+                  />
+                  <button class="prim-btn" id="ctrlApplyBtn">
+                    <i class="fa-solid fa-check"></i>Apply
+                  </button>
+                </div>
+                <div class="ctrl-hint">
+                  <i class="fa-solid fa-circle-info"></i>
+                  Recommended: 100 – 10,000 µs
+                </div>
+              </div>
+            </div>
+
+            <!-- ② CONNECTION CARD (auto-checked on load, no manual controls) -->
+            <div class="ctrl-card">
+              <div class="ctrl-card-head accent-brand">
+                <div class="ctrl-card-head-icon">
+                  <i class="fa-solid fa-network-wired"></i>
+                </div>
+                <div>
+                  <div class="ctrl-card-title">Connection</div>
+                  <div class="ctrl-card-desc">
+                    Modbus link status — checked automatically
+                  </div>
+                </div>
+              </div>
+              <div class="ctrl-card-body conn-card-body">
+                <div class="conn-status-wrap" id="connBanner">
+                  <div class="conn-dot-large pulse" id="connDot"></div>
+                  <div>
+                    <div class="conn-status-text" id="connText">
+                      Checking connection…
+                    </div>
+                    <div class="conn-status-sub" id="connSub">Please wait</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- end .ctrl-grid-2 -->
+
+          <!-- ③ MODE CARD -->
+          <div id="modeSection" class="hidden-section">
+            <div class="ctrl-card">
+              <div class="ctrl-card-head accent-green">
+                <div class="ctrl-card-head-icon">
+                  <i class="fa-solid fa-circle-half-stroke"></i>
+                </div>
+                <div>
+                  <div class="ctrl-card-title">Operation Mode</div>
+                  <div class="ctrl-card-desc">Operation mode control</div>
+                </div>
+                <span class="mode-status-pill" id="modeStatusPill">IDLE</span>
+              </div>
+              <div class="ctrl-card-body d-none">
+                <div class="mode-seg" id="modeSeg" data-mode="none">
+                  <div class="mode-seg-glider" id="modeGlider"></div>
+                  <button class="mode-seg-opt" id="btnAuto" data-active="false">
+                    <i class="fa-solid fa-bolt"></i><span>AUTO</span>
+                  </button>
+                  <button
+                    class="mode-seg-opt"
+                    id="btnManual"
+                    data-active="false"
+                  >
+                    <i class="fa-solid fa-hand"></i><span>MANUAL</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ④ SIGNAL CARDS — Status (left) + Controls (right) -->
+          <div class="ctrl-grid-2" style="align-items: start">
+            <!-- LEFT: Status Card -->
+            <div class="ctrl-card" id="signalStatusCard">
+              <div class="ctrl-card-head accent-brand">
+                <div class="ctrl-card-head-icon">
+                  <i class="fa-solid fa-signal"></i>
+                </div>
+                <div>
+                  <div class="ctrl-card-title">Signal Status</div>
+                  <div class="ctrl-card-desc">Live output state monitor</div>
+                </div>
+              </div>
+              <div class="ctrl-card-body" style="padding: 0">
+                <div class="signal-list">
+                  <div class="signal-row" id="signal1Card" data-on="false">
+                    <div class="signal-row-left">
+                      <span
+                        class="signal-dot"
+                        style="background: #e2e8f0; border: 1.5px solid #94a3b8"
+                      ></span>
+                      <div>
+                        <div class="signal-name">Signal 1</div>
+                      </div>
+                    </div>
+                    <span class="signal-badge off" id="signal1Badge"
+                      >OFF</span
+                    >
+                  </div>
+
+                  <div class="signal-row" id="signal2Card" data-on="false">
+                    <div class="signal-row-left">
+                      <span
+                        class="signal-dot"
+                        style="background: #7c3aed"
+                      ></span>
+                      <div>
+                        <div class="signal-name">Signal 2</div>
+                      </div>
+                    </div>
+                    <span class="signal-badge off" id="signal2Badge">OFF</span>
+                  </div>
+
+                  <div class="signal-row" id="signal3Card" data-on="false">
+                    <div class="signal-row-left">
+                      <span
+                        class="signal-dot"
+                        style="background: #f97316"
+                      ></span>
+                      <div>
+                        <div class="signal-name">Signal 3</div>
+                      </div>
+                    </div>
+                    <span class="signal-badge off" id="signal3Badge"
+                      >OFF</span
+                    >
+                  </div>
+
+                  <div class="signal-row" id="signal4Card" data-on="false">
+                    <div class="signal-row-left">
+                      <span
+                        class="signal-dot"
+                        style="background: #16a34a"
+                      ></span>
+                      <div>
+                        <div class="signal-name">Signal 4</div>
+                      </div>
+                    </div>
+                    <span class="signal-badge off" id="signal4Badge"
+                      >OFF</span
+                    >
+                  </div>
+
+                  <div class="signal-row" id="signal5Card" data-on="false">
+                    <div class="signal-row-left">
+                      <span
+                        class="signal-dot"
+                        style="background: #eab308"
+                      ></span>
+                      <div>
+                        <div class="signal-name">Signal 5</div>
+                      </div>
+                    </div>
+                    <span class="signal-badge off" id="signal5Badge"
+                      >OFF</span
+                    >
+                  </div>
+
+                  <div class="signal-row" id="signal6Card" data-on="false">
+                    <div class="signal-row-left">
+                      <span
+                        class="signal-dot"
+                        style="background: #dc2626"
+                      ></span>
+                      <div>
+                        <div class="signal-name">Signal 6</div>
+                      </div>
+                    </div>
+                    <span class="signal-badge off" id="signal6Badge">OFF</span>
+                  </div>
+
+                  <div class="signal-row" id="signal7Card" data-on="false">
+                    <div class="signal-row-left">
+                      <span
+                        class="signal-dot"
+                        style="
+                          background: #e5e7eb;
+                          border: 1.5px dashed #9ca3af;
+                        "
+                      ></span>
+                      <div>
+                        <div class="signal-name">Signal 7</div>
+                      </div>
+                    </div>
+                    <span class="signal-badge off" id="signal7Badge">OFF</span>
+                  </div>
+                </div>
+                <!-- end .signal-list -->
+              </div>
+            </div>
+            <!-- end LEFT card -->
+
+            <!-- RIGHT: Toggle Controls Card -->
+            <div class="ctrl-card" id="signalControlCard">
+              <div class="ctrl-card-head accent-amber">
+                <div class="ctrl-card-head-icon">
+                  <i class="fa-solid fa-tower-broadcast"></i>
+                </div>
+                <div>
+                  <div class="ctrl-card-title">Signal Controls</div>
+                  <div class="ctrl-card-desc">Manually toggle each output</div>
+                </div>
+              </div>
+              <div class="ctrl-card-body" style="padding: 0">
+                <div class="signal-list">
+                  <div class="signal-ctrl-row">
+                    <div class="signal-ctrl-name">
+                      <span
+                        class="signal-dot"
+                        style="background: #e2e8f0; border: 1.5px solid #94a3b8"
+                      ></span>
+                      White Light
+                    </div>
+                    <label class="sw">
+                      <input
+                        type="checkbox"
+                        id="whitelightToggle"
+                        data-signal="whitelight"
+                        data-fn="setWhiteLight"
+                      />
+                      <span class="sw-track"></span>
+                    </label>
+                  </div>
+
+                  <div class="signal-ctrl-row">
+                    <div class="signal-ctrl-name">
+                      <span
+                        class="signal-dot"
+                        style="background: #7c3aed"
+                      ></span>
+                      UV Light
+                    </div>
+                    <label class="sw">
+                      <input
+                        type="checkbox"
+                        id="uvlightToggle"
+                        data-signal="uvlight"
+                        data-fn="setUVLight2"
+                      />
+                      <span class="sw-track"></span>
+                    </label>
+                  </div>
+
+                  <div class="signal-ctrl-row">
+                    <div class="signal-ctrl-name">
+                      <span
+                        class="signal-dot"
+                        style="background: #f97316"
+                      ></span>
+                      Machine Break
+                    </div>
+                    <label class="sw">
+                      <input
+                        type="checkbox"
+                        id="machinebreakToggle"
+                        data-signal="machinebreak"
+                        data-fn="setMachineBreak"
+                      />
+                      <span class="sw-track"></span>
+                    </label>
+                  </div>
+
+                  <div class="signal-ctrl-row">
+                    <div class="signal-ctrl-name">
+                      <span
+                        class="signal-dot"
+                        style="background: #16a34a"
+                      ></span>
+                      Green Light
+                    </div>
+                    <label class="sw">
+                      <input
+                        type="checkbox"
+                        id="greenlightToggle"
+                        data-signal="greenlight"
+                        data-fn="setGreenLight"
+                      />
+                      <span class="sw-track"></span>
+                    </label>
+                  </div>
+
+                  <div class="signal-ctrl-row">
+                    <div class="signal-ctrl-name">
+                      <span
+                        class="signal-dot"
+                        style="background: #eab308"
+                      ></span>
+                      Yellow Light
+                    </div>
+                    <label class="sw">
+                      <input
+                        type="checkbox"
+                        id="yellowlightToggle"
+                        data-signal="yellowlight"
+                        data-fn="setYellowLight"
+                      />
+                      <span class="sw-track"></span>
+                    </label>
+                  </div>
+
+                  <div class="signal-ctrl-row">
+                    <div class="signal-ctrl-name">
+                      <span
+                        class="signal-dot"
+                        style="background: #dc2626"
+                      ></span>
+                      Red Light
+                    </div>
+                    <label class="sw">
+                      <input
+                        type="checkbox"
+                        id="redlightToggle"
+                        data-signal="redlight"
+                        data-fn="setRedLight"
+                      />
+                      <span class="sw-track"></span>
+                    </label>
+                  </div>
+
+                  <div class="signal-ctrl-row">
+                    <div class="signal-ctrl-name">
+                      <span
+                        class="signal-dot"
+                        style="
+                          background: #e5e7eb;
+                          border: 1.5px dashed #9ca3af;
+                        "
+                      ></span>
+                      Empty
+                    </div>
+                    <label class="sw">
+                      <input
+                        type="checkbox"
+                        id="emptyToggle"
+                        data-signal="empty"
+                        data-fn="setEmpty"
+                      />
+                      <span class="sw-track"></span>
+                    </label>
+                  </div>
+                </div>
+                <!-- end .signal-list -->
+              </div>
+            </div>
+            <!-- end RIGHT card -->
+          </div>
+          <!-- end signal ctrl-grid-2 -->
+
+          <!-- ④ MANUAL CONTROLS — 6 toggles -->
+          <div id="manualSection" class="hidden-section">
+            <div class="ctrl-card">
+              <div class="ctrl-card-head accent-amber">
+                <div class="ctrl-card-head-icon">
+                  <i class="fa-solid fa-wrench"></i>
+                </div>
+                <div>
+                  <div class="ctrl-card-title">Manual Controls</div>
+                  <div class="ctrl-card-desc">
+                    Manual I/O controls — click to toggle
+                  </div>
+                </div>
+              </div>
+              <div class="ctrl-card-body">
+                <div class="io-grid">
+                  <!-- Gripper -->
+                  <div class="io-box" id="gripperCard" data-on="false">
+                    <div class="io-box-top">
+                      <div class="io-box-icon">
+                        <i class="fa-solid fa-hand-rock"></i>
+                      </div>
+                      <label class="sw">
+                        <input
+                          type="checkbox"
+                          id="gripperToggle"
+                          data-device="gripper"
+                          data-fn="setGripper"
+                        />
+                        <span class="sw-track"></span>
+                      </label>
+                    </div>
+                    <div class="io-box-name">Gripper</div>
+                    <div class="io-box-sub">Mechanical grip actuator</div>
+                    <div class="io-box-status-wrap">
+                      <span class="io-state-off">
+                        <i class="fa-solid fa-circle-xmark"></i> Gripper is OFF
+                      </span>
+                      <span class="io-state-on d-none">
+                        <i class="fa-solid fa-circle-check"></i> Gripper is ON
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- UV Light -->
+                  <div class="io-box" id="uvCard" data-on="false">
+                    <div class="io-box-top">
+                      <div class="io-box-icon">
+                        <i class="fa-solid fa-sun"></i>
+                      </div>
+                      <label class="sw">
+                        <input
+                          type="checkbox"
+                          id="uvToggle"
+                          data-device="uv"
+                          data-fn="setUVLight"
+                        />
+                        <span class="sw-track"></span>
+                      </label>
+                    </div>
+                    <div class="io-box-name">UV Light</div>
+                    <div class="io-box-sub">Ultraviolet illumination</div>
+                    <div class="io-box-status-wrap">
+                      <span class="io-state-off">
+                        <i class="fa-solid fa-circle-xmark"></i> UV Light is OFF
+                      </span>
+                      <span class="io-state-on d-none">
+                        <i class="fa-solid fa-circle-check"></i> UV Light is ON
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Relay 1 -->
+                  <div class="io-box" id="relay1Card" data-on="false">
+                    <div class="io-box-top">
+                      <div class="io-box-icon">
+                        <i class="fa-solid fa-bolt"></i>
+                      </div>
+                      <label class="sw">
+                        <input
+                          type="checkbox"
+                          id="relay1Toggle"
+                          data-device="relay1"
+                          data-fn="setRelay1"
+                        />
+                        <span class="sw-track"></span>
+                      </label>
+                    </div>
+                    <div class="io-box-name">Relay 1</div>
+                    <div class="io-box-sub">Output relay channel 1</div>
+                    <div class="io-box-status-wrap">
+                      <span class="io-state-off">
+                        <i class="fa-solid fa-circle-xmark"></i> Relay 1 is OFF
+                      </span>
+                      <span class="io-state-on d-none">
+                        <i class="fa-solid fa-circle-check"></i> Relay 1 is ON
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Relay 2 -->
+                  <div class="io-box" id="relay2Card" data-on="false">
+                    <div class="io-box-top">
+                      <div class="io-box-icon">
+                        <i class="fa-solid fa-bolt"></i>
+                      </div>
+                      <label class="sw">
+                        <input
+                          type="checkbox"
+                          id="relay2Toggle"
+                          data-device="relay2"
+                          data-fn="setRelay2"
+                        />
+                        <span class="sw-track"></span>
+                      </label>
+                    </div>
+                    <div class="io-box-name">Relay 2</div>
+                    <div class="io-box-sub">Output relay channel 2</div>
+                    <div class="io-box-status-wrap">
+                      <span class="io-state-off">
+                        <i class="fa-solid fa-circle-xmark"></i> Relay 2 is OFF
+                      </span>
+                      <span class="io-state-on d-none">
+                        <i class="fa-solid fa-circle-check"></i> Relay 2 is ON
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Conveyor Belt -->
+                  <div class="io-box" id="conveyorCard" data-on="false">
+                    <div class="io-box-top">
+                      <div class="io-box-icon">
+                        <i class="fa-solid fa-arrows-left-right"></i>
+                      </div>
+                      <label class="sw">
+                        <input
+                          type="checkbox"
+                          id="conveyorToggle"
+                          data-device="conveyor"
+                          data-fn="setConveyor"
+                        />
+                        <span class="sw-track"></span>
+                      </label>
+                    </div>
+                    <div class="io-box-name">Conveyor Belt</div>
+                    <div class="io-box-sub">Belt motor control</div>
+                    <div class="io-box-status-wrap">
+                      <span class="io-state-off">
+                        <i class="fa-solid fa-circle-xmark"></i> Conveyor Belt
+                        is OFF
+                      </span>
+                      <span class="io-state-on d-none">
+                        <i class="fa-solid fa-circle-check"></i> Conveyor Belt
+                        is ON
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Sensor Light -->
+                  <div class="io-box" id="sensorCard" data-on="false">
+                    <div class="io-box-top">
+                      <div class="io-box-icon">
+                        <i class="fa-solid fa-lightbulb"></i>
+                      </div>
+                      <label class="sw">
+                        <input
+                          type="checkbox"
+                          id="sensorToggle"
+                          data-device="sensor"
+                          data-fn="setSensorLight"
+                        />
+                        <span class="sw-track"></span>
+                      </label>
+                    </div>
+                    <div class="io-box-name">Sensor Light</div>
+                    <div class="io-box-sub">Inspection ring light</div>
+                    <div class="io-box-status-wrap">
+                      <span class="io-state-off">
+                        <i class="fa-solid fa-circle-xmark"></i> Sensor Light is
+                        OFF
+                      </span>
+                      <span class="io-state-on d-none">
+                        <i class="fa-solid fa-circle-check"></i> Sensor Light is
+                        ON
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <!-- end .io-grid -->
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+    <!-- SETTINGS MODAL -->
+    <div id="settingsModal" class="modal">
+      <div class="modal-box">
+        <div class="modal-head">
+          <i class="fas fa-gear"></i>
+          <div class="modal-head-title">Detection Settings</div>
+        </div>
+
+        <div class="modal-body">
+          <div class="modal-tabs">
+            <button class="modal-tab" onclick="switchTab('detection')">
+              Detection Mode
+            </button>
+            <button class="modal-tab" onclick="switchTab('threshold')">
+              Threshold
+            </button>
+            <button class="modal-tab active" onclick="switchTab('shift')">
+              Shift Timing
+            </button>
+          </div>
+
+          <!-- Detection Mode Tab -->
+          <div id="detectionTab" class="tab-content">
+            <span class="sel-lbl" style="display: block; margin-bottom: 8px">
+              Detection Mode
+            </span>
+
+            <div class="mode-toggle">
+              <input
+                type="radio"
+                name="mode"
+                id="modeDefault"
+                value="default"
+                checked
+                onchange="toggleManual()"
+              />
+              <label for="modeDefault">Default</label>
+
+              <input
+                type="radio"
+                name="mode"
+                id="modeManual"
+                value="manual"
+                onchange="toggleManual()"
+              />
+              <label for="modeManual">Manual</label>
+            </div>
+
+            <div id="defaultInfo" style="margin: 12px 0 4px">
+              <input
+                type="text"
+                value="6.3.1"
+                readonly
+                style="
+                  width: 100%;
+                  padding: 11px 14px;
+                  font-size: 0.95rem;
+                  font-weight: 500;
+                  border: 1px solid rgba(90, 25, 31, 0.25);
+                  border-radius: 8px;
+                  background: #fefefe;
+                  color: var(--primary);
+                  cursor: default;
+                  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.03);
+                "
+              />
+
+              <p
+                style="
+                  font-size: 0.74rem;
+                  color: var(--gray-500, #6b7280);
+                  margin-top: 10px;
+                  text-align: center;
+                "
+              >
+                Mode is locked to Default in current system configuration
+              </p>
+            </div>
+
+            <div id="manualControls" style="display: none">
+              <div class="slider-block">
+                <div class="slider-row">
+                  <div class="slider-top">
+                    <span class="slider-name">Exposure</span>
+                    <input
+                      type="number"
+                      id="lowerValue"
+                      class="slider-num"
+                      value="35"
+                      min="0"
+                      max="100"
+                      oninput="
+                        document.getElementById('lowerSlider').value =
+                          this.value
+                      "
+                    />
+                  </div>
+
+                  <input
+                    type="range"
+                    id="lowerSlider"
+                    min="0"
+                    max="100"
+                    value="35"
+                    oninput="
+                      document.getElementById('lowerValue').value = this.value
+                    "
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Threshold Tab -->
+          <div id="thresholdTab" class="tab-content">
+            <span class="sel-lbl" style="display: block; margin-bottom: 8px">
+              Threshold Value
+            </span>
+
+            <input
+              type="number"
+              id="thresholdValue"
+              placeholder="Enter threshold value"
+              value="75"
+              min="0"
+              max="100"
+              style="
+                width: 100%;
+                padding: 11px 14px;
+                font-size: 0.95rem;
+                font-weight: 500;
+                border: 1px solid rgba(90, 25, 31, 0.25);
+                border-radius: 8px;
+                background: #ffffff;
+                color: var(--primary);
+                box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.03);
+              "
+            />
+
+            <p
+              style="
+                font-size: 0.74rem;
+                color: var(--gray-500, #6b7280);
+                margin-top: 10px;
+              "
+            >
+              Adjust threshold to control detection sensitivity. Higher values
+              require more confidence.
+            </p>
+          </div>
+
+          <!-- Shift Timing Tab -->
+          <div id="shiftTab" class="tab-content active">
+            <span class="sel-lbl" style="display: block; margin-bottom: 8px">
+              Create / Update Shift Timing
+            </span>
+
+            <div class="form-field">
+              <label for="shiftName">
+                Shift Name <span style="color: #ef233c">*</span>
+              </label>
+              <input
+                type="text"
+                id="shiftName"
+                placeholder="e.g. Shift 1"
+                autocomplete="off"
+              />
+            </div>
+
+            <div class="form-field">
+              <label for="shiftStart">
+                Start Time <span style="color: #ef233c">*</span>
+              </label>
+              <input type="time" id="shiftStart" />
+            </div>
+
+            <div class="form-field">
+              <label for="shiftEnd">
+                End Time <span style="color: #ef233c">*</span>
+              </label>
+              <input type="time" id="shiftEnd" />
+            </div>
+
+            <button
+              class="btn-m primary"
+              type="button"
+              onclick="saveShiftTiming()"
+              style="width: 100%; margin-top: 8px"
+            >
+              <i class="fas fa-save"></i> Save Shift
+            </button>
+
+            <div style="margin-top: 18px">
+              <span class="sel-lbl" style="display: block; margin-bottom: 8px">
+                Shift List
+              </span>
+
+              <div style="max-height: 220px; overflow-y: auto">
+                <table class="shift-table">
+                  <thead>
+                    <tr>
+                      <th>Shift</th>
+                      <th>Start</th>
+                      <th>End</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="shiftTableBody">
+                    <tr>
+                      <td colspan="4">Loading shifts...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-foot">
+          <button class="btn-m ghost" onclick="closeSettings()">Cancel</button>
+          <button class="btn-m primary" onclick="saveSettings()">
+            Save Settings
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOAST -->
+    <div class="toast" id="toast"></div>
+
+    <!-- ═══ ERROR MODAL ═══ -->
+    <div class="err-overlay" id="errOverlay" style="display: none">
+      <div class="err-box">
+        <div class="err-icon-ring">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div class="err-title">Error</div>
+        <div class="err-msg" id="errMsg"></div>
+        <button class="err-dismiss-btn" id="errDismiss">
+          <i class="fa-solid fa-xmark"></i>Dismiss
+        </button>
+      </div>
+    </div>
+    <script src="../static/script/controller.js"></script>
+    <script src="../static/script/settings_common.js"></script>
+  </body>
+</html>
