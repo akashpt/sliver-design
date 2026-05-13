@@ -684,7 +684,7 @@ async function stopCamera() {
     if (activeMode !== null) return;
 
     // Clear + reset modal fields
-    [ "tsCount", "tsYarn", "tsColor"].forEach((id) => {
+    [ "tsCount", "tsYarn", "tsColor", "tsExpectedStripCount"].forEach((id) => { 
       const el = $(id);
       if (el) {
         el.value = "";
@@ -705,9 +705,10 @@ async function stopCamera() {
   async function confirmTraining() {
     // ── Validate ALL four fields (all mandatory) ──────────────────────
     const fields = [
-       { id: "tsCount", label: "Count" },
+      { id: "tsCount", label: "Count" },
       { id: "tsYarn", label: "Yarn" },
       { id: "tsColor", label: "Color" },
+      { id: "tsExpectedStripCount", label: "Expected Strip Count" },
     ];
 
     let firstError = null;
@@ -737,13 +738,14 @@ async function stopCamera() {
     const count = $("tsCount").value.trim();
     const yarn = $("tsYarn").value.trim();
     const color = $("tsColor").value.trim();
+    const expected_strip_count = $("tsExpectedStripCount").value.trim();
 
     // Close modal
     $("trainingSessionModal").style.display = "none";
 
     // Send values to bridge.py → saveTrainingSession()
     // Bridge.sendTrainingSession({  count, yarn, color });
-    const sessionRes = await Bridge.sendTrainingSession({ count, yarn, color });
+    const sessionRes = await Bridge.sendTrainingSession({ count, yarn, color, expected_strip_count});
 
     if (!sessionRes?.ok) {
       showToast(sessionRes?.message || "❌ Failed to start training session", 4000);
@@ -764,8 +766,11 @@ async function stopCamera() {
     // $("statusLabel").textContent = "TRAINING";
     if ($("statusLabel")) $("statusLabel").textContent = "TRAINING";
     applyUIState("training");
+    // addLog(
+    //   `🎓 Training — Job: · Count: ${count} · Yarn: ${yarn} · Color: ${color}`,
+    // );
     addLog(
-      `🎓 Training — Job: · Count: ${count} · Yarn: ${yarn} · Color: ${color}`,
+      `🎓 Training — Count: ${count} · Yarn: ${yarn} · Color: ${color} · Expected Strip Count: ${expected_strip_count}`,
     );
   }
 
@@ -836,7 +841,7 @@ async function stopCamera() {
     });
 
     // Remove input-error highlight as user types
-    [ "tsCount", "tsYarn", "tsColor"].forEach((id) => {
+    [ "tsCount", "tsYarn", "tsColor", "tsExpectedStripCount"].forEach((id) => {
       $(id)?.addEventListener("input", () =>
         $(id).classList.remove("input-error"),
       );

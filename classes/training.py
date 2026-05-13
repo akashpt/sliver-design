@@ -3,7 +3,7 @@ import numpy as np
 import json
 from pathlib import Path
 
-from path import MODELS_DIR
+from path import MODELS_DIR, SETTINGS_FILE
 
 
 class StripColorTraining:
@@ -13,6 +13,35 @@ class StripColorTraining:
         self.expected_strip_count = 8
         self.minimum_strip_gap = 35
         self.center_crop_percent = 0.35
+
+        self.load_settings_values()
+
+
+    def load_settings_values(self):
+
+        try:
+
+            if not SETTINGS_FILE.exists():
+                return
+
+            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                config = json.load(f)
+
+            self.minimum_strip_gap = int(
+                config.get("minimum_strip_gap", 35)
+            )
+
+            self.center_crop_percent = float(
+                config.get("center_crop_percent", 0.25)
+            )
+
+            print("Training Settings Loaded")
+            print("minimum_strip_gap =", self.minimum_strip_gap)
+            print("center_crop_percent =", self.center_crop_percent)
+
+        except Exception as e:
+
+            print("Training Settings Load Error:", e)
 
     # ---------------- DETECT STRIPS ----------------
     def detect_horizontal_strips(self, image):
@@ -45,8 +74,8 @@ class StripColorTraining:
             if all(abs(y - c) > self.minimum_strip_gap for c in strip_centers):
                 strip_centers.append(y)
 
-            if len(strip_centers) == self.expected_strip_count:
-                break
+            # if len(strip_centers) == self.expected_strip_count:
+            #     break
 
         strip_centers = sorted(strip_centers)
 
@@ -122,14 +151,17 @@ class StripColorTraining:
         return strip_lab_values
 
     # ---------------- TRAIN ----------------
-    def train(self, folder_path, model_key):
+    def train(self, folder_path, model_key,expected_strip_count=8):
+
+        self.expected_strip_count = int(expected_strip_count)
 
         folder_path = Path(folder_path)
 
         if not folder_path.exists():
             return {"ok": False, "message": "Folder not found"}
 
-        all_strip_data = {str(i): [] for i in range(1, 9)}
+        #all_strip_data = {str(i): [] for i in range(1, 9)}
+        all_strip_data = {str(i): [] for i in range(1, self.expected_strip_count + 1)}
 
         image_extensions = [".jpg", ".jpeg", ".png", ".bmp"]
 
@@ -147,6 +179,16 @@ class StripColorTraining:
 
             strip_lab = self.process_image(img)
 
+            # -------- CHECK STRIP COUNT --------
+            detected_strip_count = len(strip_lab)
+
+            if detected_strip_count != self.expected_strip_count:
+                print(
+                    f"Skipping {image_path.name} "
+                    f"(Detected {detected_strip_count} strips)"
+                )
+                continue
+
             for strip_id, values in strip_lab.items():
                 all_strip_data[strip_id].extend(values)
         
@@ -157,6 +199,7 @@ class StripColorTraining:
         output_file = material_folder / f"{model_key}.json"
 
         model_data = {
+            "expected_strip_count": self.expected_strip_count,
             "strip_lab_values": all_strip_data,
         }
 

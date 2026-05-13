@@ -301,6 +301,22 @@ class Bridge(QObject):
                     "message": "No training images found for this model"
                 })
 
+            expected_strip_count = 8
+
+            try:
+                model_json = MODELS_DIR / job_id / f"{job_id}.json"
+
+                if model_json.exists():
+                    with open(model_json, "r", encoding="utf-8") as f:
+                        old_model = json.load(f)
+
+                    expected_strip_count = int(
+                        old_model.get("expected_strip_count", 8)
+                    )
+
+            except Exception as e:
+                print("❌ Error reading model expected strip count:", e)
+
             backup_folder = None
 
             if model_folder.exists():
@@ -308,7 +324,7 @@ class Bridge(QObject):
                 shutil.move(str(model_folder), str(backup_folder))
 
             trainer = StripColorTraining()
-            result = trainer.train(str(training_folder), job_id)
+            result = trainer.train(str(training_folder), job_id, expected_strip_count)
 
             if result.get("ok"):
                 if backup_folder and backup_folder.exists():
@@ -499,8 +515,10 @@ class Bridge(QObject):
 
 
             predictor = StripColorPrediction()
+            predictor.load_model(job_id)
 
-            strips = predictor.detect_horizontal_strips(img)
+            resized_img = cv2.resize(img, (640, 480))
+            strips = predictor.detect_horizontal_strips(resized_img)
 
             found_strip_count = len(strips)
             expected_strip_count = predictor.expected_strip_count
@@ -535,7 +553,8 @@ class Bridge(QObject):
             training_folder = self.get_training_job_folder(job_id)
 
             trainer = StripColorTraining()
-            result = trainer.train(str(training_folder), job_id)
+            result = trainer.train(str(training_folder), job_id, expected_strip_count)
+
 
             if result.get("ok"):
                 return json.dumps({
@@ -1562,15 +1581,18 @@ class Bridge(QObject):
                 "count": data.get("count", ""),
                 "yarn": data.get("yarn", ""),
                 "color": data.get("color", ""),
+                "expected_strip_count": data.get("expected_strip_count", "8"),
                 "savedAt": datetime.now().isoformat(timespec="seconds"),
             }
+
+            print("Expected Strip Count =", record["expected_strip_count"])
 
             with open(TRAINING_SETTINGS_FILE, "w", encoding="utf-8") as f:
                 json.dump(record, f, indent=2)
 
             print("TRAINING_IMAGES_DIR =", TRAINING_IMAGES_DIR)
 
-            folder_name = f"{record['count']}_{record['yarn']}_{record['color']}"
+            folder_name = f"{record['count']}_{record['yarn']}_{record['color']}_{record['expected_strip_count']}"
             folder_name = folder_name.replace(" ", "_")
             print("folder_name =", folder_name)
 
@@ -1616,8 +1638,23 @@ class Bridge(QObject):
             print("🛑 Training stopped for folder:", folder_name)
             print("📂 Training images folder:", training_folder)
 
+            expected_strip_count = 8
+
+            try:
+                if os.path.exists(TRAINING_SETTINGS_FILE):
+                    with open(TRAINING_SETTINGS_FILE, "r", encoding="utf-8") as f:
+                        settings_data = json.load(f)
+
+                    expected_strip_count = int(
+                        settings_data.get("expected_strip_count", 8)
+                    )
+
+            except Exception as e:
+                print("❌ Error reading expected_strip_count:", e)
+
             trainer = StripColorTraining()
             result = trainer.train(str(training_folder), folder_name)
+            result = trainer.train(str(training_folder), folder_name,expected_strip_count)
 
             self.get_system_storage()
 

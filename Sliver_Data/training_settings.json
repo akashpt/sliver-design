@@ -2,5 +2,6 @@
   "count": "001",
   "yarn": "cotton",
   "color": "trial",
+  "expected_strip_count": "8",
   "savedAt": "2026-05-02T12:58:21"
 }

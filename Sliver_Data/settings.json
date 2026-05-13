@@ -7,5 +7,7 @@
   "min_exposure": 31,
   "max_exposure": 4063201,
   "prediction_interval_seconds": 1,
-  "background_threshold": 45
+  "background_threshold": 45,
+  "minimum_strip_gap": 35,
+  "center_crop_percent": 0.35
 }

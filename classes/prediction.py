@@ -16,6 +16,8 @@ class StripColorPrediction:
         self.expected_strip_count = 8
         self.minimum_strip_gap = 35
         self.center_crop_percent = 0.35
+        self.minimum_strip_gap = self.get_minimum_strip_gap()
+        self.center_crop_percent = self.get_center_crop_percent() 
         self.color_threshold = color_threshold
 
     # ---------------- LOAD MODEL ----------------
@@ -31,8 +33,18 @@ class StripColorPrediction:
             if not model_path.exists():
                 return None
 
+            # with open(model_path, "r") as f:
+            #     return json.load(f)
+
             with open(model_path, "r") as f:
-                return json.load(f)
+                model_data = json.load(f)
+
+            self.expected_strip_count = int(model_data.get("expected_strip_count", 8))
+
+            print("Loaded expected_strip_count =", self.expected_strip_count)
+
+            return model_data
+
         except Exception as e:
             print("Load Model Error :",e)
 
@@ -54,6 +66,52 @@ class StripColorPrediction:
         except Exception as e:
             print("Background Threshold Error :", e)
             return 45
+
+
+    def get_minimum_strip_gap(self):
+
+        try:
+
+            default_value = 35
+
+            if not SETTINGS_FILE.exists():
+                return default_value
+
+            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                config = json.load(f)
+
+            return int(
+                config.get("minimum_strip_gap", default_value)
+            )
+
+        except Exception as e:
+
+            print("Minimum Strip Gap Error :", e)
+
+            return 35
+
+
+    def get_center_crop_percent(self):
+
+        try:
+
+            default_value = 0.25
+
+            if not SETTINGS_FILE.exists():
+                return default_value
+
+            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                config = json.load(f)
+
+            return float(
+                config.get("center_crop_percent", default_value)
+            )
+
+        except Exception as e:
+
+            print("Center Crop Percent Error :", e)
+
+            return 0.25
 
     # ---------------- DETECT STRIPS ----------------
 
@@ -87,8 +145,8 @@ class StripColorPrediction:
             if all(abs(y - c) > self.minimum_strip_gap for c in strip_centers):
                 strip_centers.append(y)
 
-            if len(strip_centers) == self.expected_strip_count:
-                break
+            # if len(strip_centers) == self.expected_strip_count:
+            #     break
 
         strip_centers = sorted(strip_centers)
 
@@ -283,6 +341,24 @@ class StripColorPrediction:
     def process_image(self, img, model_key):
         model_data = self.load_model(model_key)
 
+            # -------- DRAW --------
+            cv2.rectangle(vis, (x_start, y1), (x_end, y2), color, 2)
+            cv2.putText(
+                vis,
+                f"S{i} {status} (dE={min_dE:.2f})",
+                (x_start + 5, max(20, y1 - 6)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                color,
+                2
+            )
+
+            results.append(status)
+
+        print("frame entered prediction")
+
+        # -------- FINAL return --------
+        bad_strip_indices = [i for i, r in enumerate(results, 1) if r == "DEFECT"]
         if model_data is None:
             print("❌ MODEL NOT FOUND")
             vis = img.copy()
