@@ -58,7 +58,8 @@ class Bridge(QObject):
         self.last_prediction_interval_seconds = self.pr_time
         # self.pr_time = 1  # seconds
         self.process = None
-        self.prediction_live = False
+        # self.prediction_live = False
+        self.prediction_live = self.get_prediction_live()
         self.reset_click = False
 
         self.count_time = QTimer()
@@ -157,6 +158,21 @@ class Bridge(QObject):
             print("❌ Error reading config:", e)
 
         return "", ""
+
+
+    def get_prediction_live(self):
+        try:
+            if not os.path.exists(self.config_path):
+                return False
+
+            with open(self.config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+
+            return bool(config.get("prediction_live", False))
+
+        except Exception as e:
+            print("❌ get_prediction_live error:", e)
+            return False
     
     @pyqtSlot()
     def resetUserConfig(self):
@@ -808,9 +824,9 @@ class Bridge(QObject):
             frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
 
             # frame = cv2.imread(r"/home/texa_developer/Divya Data/i_sliver-design/strips.jpeg")
-            # frame = cv2.imread(r"D:\Texa\sliver\sliver-design\Sliver_Data\WhatsApp Image 2026-04-29 at 2.33.25 PM.jpeg")
 
-            # =========================defect_path
+
+            # =========================
             # SAVE CURRENT FRAME
             # =========================
             self.current_frame = frame.copy()
