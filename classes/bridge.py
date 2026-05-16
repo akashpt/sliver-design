@@ -2,20 +2,18 @@ import cv2
 import base64
 import json
 import os
-import sqlite3
-import random
 import shutil
 from datetime import datetime, timedelta, time as datetime_time
 from pathlib import Path
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot, QTimer, QStandardPaths, QDir
 from PyQt5.QtWidgets import QApplication  # Only if needed elsewhere
 from classes.mindvision import MindVisionCamera
-from path import DB_FILE,SETTINGS_FILE, TRAINING_IMAGES_DIR, SESSION_LOG_DIR, PREDICTION_IMAGES_DIR, TRAINING_SETTINGS_FILE, MODELS_DIR, EMAIL_PAGE, STORAGE_FILE, INDEX_PAGE, TRAINING_PAGE, SETTINGS_PAGE
+from path import SETTINGS_FILE, TRAINING_IMAGES_DIR, SESSION_LOG_DIR, PREDICTION_IMAGES_DIR, TRAINING_SETTINGS_FILE, MODELS_DIR, EMAIL_PAGE, STORAGE_FILE, INDEX_PAGE, TRAINING_PAGE, SETTINGS_PAGE
 from classes.training import StripColorTraining
 from classes.prediction import StripColorPrediction
 from classes.modbus_relay_code import *
 from classes.invoice_pdf import InvoicePDFGenerator
-from classes.database import create_new_shift_version
+from classes.database import create_new_shift_version,fetch_one,execute,fetch_all
 # from datetime import datetime, time
 # from classes.report import ReportManager
 
@@ -31,7 +29,6 @@ class Bridge(QObject):
         super().__init__()
         self.app_ref = app_ref
 
-        self.db_path = str(DB_FILE)   # set DB path
         self.config_path= str(SETTINGS_FILE)
         
         # Camera
@@ -945,17 +942,13 @@ class Bridge(QObject):
                         material = job_id
                         training_color = "-"
 
-                        conn = sqlite3.connect(self.db_path)
-                        cursor = conn.cursor()
-                        cursor.execute("""
+                        row = fetch_one("""
                             SELECT machine_no
                             FROM REPORT
                             WHERE job_id = ?
                             ORDER BY id DESC
                             LIMIT 1
                         """, (job_id,))
-                        row = cursor.fetchone()
-                        conn.close()
 
                         if row and row[0]:
                             machine_no = row[0]
@@ -1274,10 +1267,7 @@ class Bridge(QObject):
     @pyqtSlot(result=str)
     def getShifts(self):
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-
-            cursor.execute("""
+            rows = fetch_all("""
                 SELECT 
                     id,
                     shift_name,
@@ -1289,9 +1279,6 @@ class Bridge(QObject):
                 FROM SHIFT
                 ORDER BY active DESC, id DESC
             """)
-
-            rows = cursor.fetchall()
-            conn.close()
 
             shifts = []
 
@@ -1319,11 +1306,11 @@ class Bridge(QObject):
             })
 
 
-    def get_current_shift_name(self, cursor):
+    def get_current_shift_name(self):
         try:
             now_time = datetime.now().strftime("%H:%M:%S")
 
-            cursor.execute("""
+            row = fetch_one("""
                 SELECT shift_name
                 FROM SHIFT
                 WHERE active = 1
@@ -1331,8 +1318,6 @@ class Bridge(QObject):
                 AND time(?) < time(end_time)
                 LIMIT 1
             """, (now_time, now_time))
-
-            row = cursor.fetchone()
 
             if row:
                 return row[0]
@@ -1351,18 +1336,14 @@ class Bridge(QObject):
                 print("⚠️ No job_id found in config")
                 return
 
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-
             # ✅ Get current shift_name
-            shift_name = self.get_current_shift_name(cursor)
+            shift_name = self.get_current_shift_name()
 
             if not shift_name:
                 print("⚠️ No active shift found")
                 shift_name = "-"
 
-            # ✅ Insert into REPORT
-            cursor.execute("""
+            execute("""
                 INSERT INTO REPORT (
                     shift_name,
                     machine_no,
@@ -1387,9 +1368,6 @@ class Bridge(QObject):
                 bad_image_path,
             ))
 
-            conn.commit()
-            conn.close()
-
             self.get_system_storage()
 
             print(
@@ -1405,10 +1383,7 @@ class Bridge(QObject):
             if not job_id:
                 return ""
 
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-
-            cursor.execute("""
+            row = fetch_one("""
                 SELECT threshold
                 FROM REPORT
                 WHERE job_id = ?
@@ -1417,9 +1392,6 @@ class Bridge(QObject):
                 ORDER BY id DESC
                 LIMIT 1
             """, (job_id,))
-
-            row = cursor.fetchone()
-            conn.close()
 
             return str(row[0]) if row and row[0] is not None else ""
 
@@ -1458,10 +1430,7 @@ class Bridge(QObject):
                 return json.dumps({"images": []})
             
 
-            conn = sqlite3.connect(DB_FILE)
-            cursor = conn.cursor()
-
-            cursor.execute("""
+            rows = fetch_all("""
                 SELECT bad_image_path
                 FROM REPORT
                 WHERE job_id = ?
@@ -1471,9 +1440,6 @@ class Bridge(QObject):
                 ORDER BY datetime(created_time) DESC
                 LIMIT 10
             """, (job_id,))
-
-            rows = cursor.fetchall()
-            conn.close()
 
             images = []
 
@@ -1504,18 +1470,7 @@ class Bridge(QObject):
     @pyqtSlot(str, result=str)
     def get_counts(self, job_id):
         try:
-            # print("🔥 get_counts CALLED")
-            # print("job_id from UI =", job_id)
-            # print("db_path =", self.db_path)
-
-            conn = sqlite3.connect(self.db_path)
-            print("✅ DB connected")
-
-            cursor = conn.cursor()
-            print("✅ cursor created")
-
-            print("✅ before execute")
-            cursor.execute("""
+            row = fetch_one("""
                 SELECT 
                     COUNT(*) AS inspected,
                     SUM(CASE WHEN LOWER(result) = 'good' THEN 1 ELSE 0 END) AS good,
@@ -1524,14 +1479,7 @@ class Bridge(QObject):
                 WHERE job_id = ?
                 AND date(created_time) = date('now', 'localtime')
             """, (job_id,))
-            print("✅ after execute")
 
-            row = cursor.fetchone()
-            # print("✅ after fetchone")
-            # print("DB row =", row)
-
-            # conn.close()
-            # print("✅ DB closed")
 
             inspected = row[0] if row and row[0] is not None else 0
             good = row[1] if row and row[1] is not None else 0
@@ -1558,10 +1506,8 @@ class Bridge(QObject):
 
     def load_db_counts_for_job(self, job_id):
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
 
-            cursor.execute("""
+            row = fetch_one("""
                 SELECT 
                     COUNT(*) AS inspected,
                     SUM(CASE WHEN LOWER(result) = 'good' THEN 1 ELSE 0 END) AS good,
@@ -1571,17 +1517,9 @@ class Bridge(QObject):
                 AND date(created_time) = date('now', 'localtime')
             """, (job_id,))
 
-            row = cursor.fetchone()
-            conn.close()
-
             self.inspected = row[0] if row and row[0] is not None else 0
             self.good = row[1] if row and row[1] is not None else 0
             self.bad = row[2] if row and row[2] is not None else 0
-
-            # print("✅ DB counts loaded into live counters")
-            # print("self.inspected =", self.inspected)
-            # print("self.good =", self.good)
-            # print("self.bad =", self.bad)
 
         except Exception as e:
             print("❌ load_db_counts_for_job error:", e)
@@ -1724,21 +1662,14 @@ class Bridge(QObject):
 
             date_condition = date_filter_map[period]
 
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-
-            # cards
-            cursor.execute(
-                f"""
+            row = fetch_one(f"""
                 SELECT
                     COUNT(*) AS inspected,
                     SUM(CASE WHEN LOWER(COALESCE(result, '')) = 'good' THEN 1 ELSE 0 END) AS good,
                     SUM(CASE WHEN LOWER(COALESCE(result, '')) IN ('defect', 'bad', 'strip missing') THEN 1 ELSE 0 END) AS bad
                 FROM REPORT
                 WHERE {date_condition}
-                """
-            )
-            row = cursor.fetchone()
+            """)
 
             inspected = row[0] if row and row[0] is not None else 0
             good = row[1] if row and row[1] is not None else 0
@@ -1754,8 +1685,7 @@ class Bridge(QObject):
                 hourly_labels = [f"{h:02d}" for h in range(24)]
                 hourly_values = [0] * 24
 
-                cursor.execute(
-                    f"""
+                rows = fetch_all(f"""
                     SELECT
                         strftime('%H', created_time) AS hour_label,
                         COUNT(*) AS total
@@ -1764,10 +1694,9 @@ class Bridge(QObject):
                     AND LOWER(COALESCE(result, '')) IN ('defect', 'bad', 'strip missing')
                     GROUP BY strftime('%H', created_time)
                     ORDER BY hour_label
-                    """
-                )
+                """)
 
-                for hour_label, total in cursor.fetchall():
+                for hour_label, total in rows:
                     if hour_label is not None:
                         hourly_values[int(hour_label)] = total
 
@@ -1775,7 +1704,7 @@ class Bridge(QObject):
                 hourly_labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
                 hourly_values = [0] * 7
 
-                cursor.execute(
+                rows = fetch_all(
                     f"""
                     SELECT
                         strftime('%w', created_time) AS day_no,
@@ -1798,7 +1727,7 @@ class Bridge(QObject):
                     "0": 6,  # Sun
                 }
 
-                for day_no, total in cursor.fetchall():
+                for day_no, total in rows:
                     if day_no in sqlite_to_idx:
                         hourly_values[sqlite_to_idx[day_no]] = total
 
@@ -1806,7 +1735,7 @@ class Bridge(QObject):
                 hourly_labels = [str(i) for i in range(1, 32)]
                 hourly_values = [0] * 31
 
-                cursor.execute(
+                rows = fetch_all(
                     f"""
                     SELECT
                         strftime('%d', created_time) AS day_label,
@@ -1819,13 +1748,11 @@ class Bridge(QObject):
                     """
                 )
 
-                for day_label, total in cursor.fetchall():
+                for day_label, total in rows:
                     if day_label is not None:
                         idx = int(day_label) - 1
                         if 0 <= idx < 31:
                             hourly_values[idx] = total
-
-            conn.close()
 
             data = {
                 "ok": True,
@@ -2209,17 +2136,11 @@ class Bridge(QObject):
             now = datetime.now()
             today = now.date()
 
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-
-            cursor.execute("""
+            rows = fetch_all("""
                 SELECT shift_name, start_time, end_time
                 FROM SHIFT
                 WHERE active = 1
             """)
-
-            rows = cursor.fetchall()
-            conn.close()
 
             current_shift = None
 

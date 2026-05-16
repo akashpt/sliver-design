@@ -1,11 +1,10 @@
 import json
-import sqlite3
-from path import DB_FILE
+from classes.database import fetch_one
 
 
 class ReportManager:
     def __init__(self, db_path=None):
-        self.db_path = str(DB_FILE)
+        pass
 
     def get_summary(self):
         """
@@ -18,30 +17,27 @@ class ReportManager:
         }
         """
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
+            total_row = fetch_one("""
+                SELECT COUNT(*)
+                FROM REPORT
+            """)
 
-            # Total inspected rows
-            cursor.execute("SELECT COUNT(*) FROM REPORT")
-            total = cursor.fetchone()[0] or 0
-
-            # Good rows
-            cursor.execute("""
+            total = total_row[0] if total_row else 0
+            good_row = fetch_one("""
                 SELECT COUNT(*)
                 FROM REPORT
                 WHERE LOWER(COALESCE(result, '')) = 'good'
             """)
-            good = cursor.fetchone()[0] or 0
 
-            # Defective rows
-            cursor.execute("""
+            good = good_row[0] if good_row else 0
+
+            defective_row = fetch_one("""
                 SELECT COUNT(*)
                 FROM REPORT
                 WHERE LOWER(COALESCE(result, '')) != 'good'
             """)
-            defective = cursor.fetchone()[0] or 0
 
-            conn.close()
+            defective = defective_row[0] if defective_row else 0
 
             return {
                 "ok": True,

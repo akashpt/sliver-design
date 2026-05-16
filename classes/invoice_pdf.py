@@ -1,13 +1,11 @@
 import re
 import json
-import sqlite3
 from datetime import datetime
 from pathlib import Path
-
+from classes.database import fetch_one,fetch_all
 from PyQt5.QtCore import QUrl, QEventLoop, QTimer
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from path import (
-    DB_FILE,
     REPORT_NEW,
     INVOICE_PDF,
     PREDICTION_IMAGES_DIR,
@@ -18,7 +16,7 @@ from path import (
 
 class InvoicePDFGenerator:
     def __init__(self):
-        self.db_path = str(DB_FILE)
+        pass
 
     def _file_uri(self, path):
         path = Path(path)
@@ -35,8 +33,6 @@ class InvoicePDFGenerator:
 
     # def _fetch_report_data(self, start_time=None, end_time=None):
     def _fetch_report_data(self, start_time=None, end_time=None, force_report_start_time=None, force_report_end_time=None):
-        conn = sqlite3.connect(self.db_path)
-        cur = conn.cursor()
 
         config_path = SETTINGS_FILE
 
@@ -61,26 +57,22 @@ class InvoicePDFGenerator:
             date_condition = "date(created_time) = date('now', 'localtime')"
             time_params = ()
 
-        cur.execute("SELECT COUNT(*) FROM REPORT WHERE job_id = ?", (job_id,))
-        print("ONLY JOB ROWS =", cur.fetchone()[0])
-
-        cur.execute(f"""
-            SELECT
-                COUNT(*) AS inspected,
-                SUM(CASE WHEN LOWER(COALESCE(result,'')) = 'good' THEN 1 ELSE 0 END) AS good,
-                SUM(CASE WHEN LOWER(COALESCE(result,'')) IN ('defect','bad') THEN 1 ELSE 0 END) AS defective,
-                SUM(CASE WHEN LOWER(COALESCE(result,'')) = 'strip missing' THEN 1 ELSE 0 END) AS missing,
-                COALESCE(MAX(machine_no), '-') AS machine_no,
-                ? AS job_id,
-                COALESCE(MAX(threshold), '-') AS threshold,
-                MIN(created_time) AS start_time,
-                MAX(created_time) AS end_time
-            FROM REPORT
-            WHERE {date_condition}
-            AND job_id = ?
-        """, (job_id, *time_params, job_id))
-
-        summary = cur.fetchone()
+        summary = fetch_one(f"""
+                SELECT
+                    COUNT(*) AS inspected,
+                    SUM(CASE WHEN LOWER(COALESCE(result,'')) = 'good' THEN 1 ELSE 0 END) AS good,
+                    SUM(CASE WHEN LOWER(COALESCE(result,'')) IN ('defect','bad') THEN 1 ELSE 0 END) AS defective,
+                    SUM(CASE WHEN LOWER(COALESCE(result,'')) = 'strip missing' THEN 1 ELSE 0 END) AS missing,
+                    COALESCE(MAX(machine_no), '-') AS machine_no,
+                    ? AS job_id,
+                    COALESCE(MAX(threshold), '-') AS threshold,
+                    MIN(created_time) AS start_time,
+                    MAX(created_time) AS end_time
+                FROM REPORT
+                WHERE {date_condition}
+                AND job_id = ?
+            """, (job_id, *time_params, job_id))
+        
         if summary and force_report_start_time and force_report_end_time:
             summary = list(summary)
             summary[7] = force_report_start_time
@@ -89,7 +81,7 @@ class InvoicePDFGenerator:
 
         print("PDF SUMMARY =", summary)
 
-        cur.execute(f"""
+        defects = fetch_all(f"""
             SELECT
                 id,
                 created_time,
@@ -105,9 +97,6 @@ class InvoicePDFGenerator:
             ORDER BY datetime(created_time) DESC
         """,((*time_params, job_id)))#if want to limit the images in the report, add "LIMIT 10" at the end of this query 10 id no of images 
 
-        defects = cur.fetchall()
-
-        conn.close()
         return summary, defects
 
     def _replace_table(self, html, class_name, rows_html):
