@@ -15,7 +15,9 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("Sliver Design System")
-        self.resize(1200, 800)
+        # self.resize(1200, 800)
+        self.showMaximized()
+        # self.showFullScreen()
 
         # WebEngine View
         self.view = QWebEngineView()

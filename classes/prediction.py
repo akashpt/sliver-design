@@ -340,25 +340,6 @@ class StripColorPrediction:
     # ---------------- ----------------
     def process_image(self, img, model_key):
         model_data = self.load_model(model_key)
-
-            # -------- DRAW --------
-            cv2.rectangle(vis, (x_start, y1), (x_end, y2), color, 2)
-            cv2.putText(
-                vis,
-                f"S{i} {status} (dE={min_dE:.2f})",
-                (x_start + 5, max(20, y1 - 6)),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                color,
-                2
-            )
-
-            results.append(status)
-
-        print("frame entered prediction")
-
-        # -------- FINAL return --------
-        bad_strip_indices = [i for i, r in enumerate(results, 1) if r == "DEFECT"]
         if model_data is None:
             print("❌ MODEL NOT FOUND")
             vis = img.copy()

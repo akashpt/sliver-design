@@ -125,9 +125,7 @@ class Bridge(QObject):
             with open(self.config_path, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=2) #w py dict into json
 
-            print("✅ Process Confirmed")
-            print("Job:", job_id)
-            print("Threshold:", threshold)
+            print("✅ Process Confirmed", job_id, threshold)
            
 
             return json.dumps({
@@ -384,32 +382,6 @@ class Bridge(QObject):
         return exposure
 
 
-    def apply_webcam_exposure(self, exposure):
-        try:
-            import subprocess
-
-            # 🔥 Convert UI exposure (0–10000) → webcam range (10–625)
-            cam_exp = max(10, min(625, int(exposure / 20)))
-
-            # Step 1: Set manual mode
-            subprocess.run(
-                ["v4l2-ctl", "-d", "/dev/video0", "--set-ctrl=auto_exposure=1"],
-                check=False
-            )
-
-            # Step 2: Set exposure
-            subprocess.run(
-                ["v4l2-ctl", "-d", "/dev/video0", f"--set-ctrl=exposure_time_absolute={cam_exp}"],
-                check=False
-            )
-
-            print("📷 Webcam exposure applied via v4l2:")
-            print("UI exposure =", exposure)
-            print("Camera exposure =", cam_exp)
-
-        except Exception as e:
-            print("❌ apply_webcam_exposure error:", e)
-
     def get_prediction_interval_seconds(self):
         try:
             default_seconds = 1
@@ -643,7 +615,7 @@ class Bridge(QObject):
                 return "Camera not available"
 
             # print("✅ Using Webcam")
-            self.apply_webcam_exposure(exposure)            
+            # self.apply_webcam_exposure(exposure)            
 
         self.camera_open = True
 
@@ -714,7 +686,6 @@ class Bridge(QObject):
     @pyqtSlot()
     def stopCamera(self):
         try:
-            print("checking...123")
             self.prediction_live = False
             self.camera_stop()
         except Exception as e:
@@ -969,7 +940,7 @@ class Bridge(QObject):
                         #     args=(str(file_path), machine_no, frame_no, material, training_color, defect_time),
                         #     daemon=True
                         # ).start()
-                        print(f"Saved: {file_path}")
+                        # print(f"Saved: {file_path}")
                        
                         # defect_payload = {
                         #     "status": status,
@@ -1370,10 +1341,10 @@ class Bridge(QObject):
 
             self.get_system_storage()
 
-            print(
-                f"✅ Report row inserted: shift_name={shift_name}, job_id={job_id}, "
-                f"threshold={threshold}, status={result_status}, image={bad_image_path}"
-            )
+            # print(
+            #     f"✅ Report row inserted: shift_name={shift_name}, job_id={job_id}, "
+            #     f"threshold={threshold}, status={result_status}, image={bad_image_path}"
+            # )
 
         except Exception as e:
             print("❌ save_report_entry error:", e)
