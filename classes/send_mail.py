@@ -15,24 +15,24 @@ def load_email_template():
 def send_email_with_attachments(attachments_path,machine_no="",frame_no="",material="",color="",defect_time="",retries=3,wait_seconds=5):
     SMTP_SERVER = "smtp.gmail.com"
     SMTP_PORT = 587
-    SENDER_EMAIL = "divyadharsinimurugesan@gmail.com"
-    SENDER_PASSWORD = "jbfg kjeh wtld uajn"
+    # SENDER_EMAIL = "divyadharsinimurugesan@gmail.com"
+    # SENDER_PASSWORD = "jbfg kjeh wtld uajn"
     # RECIPIENT_EMAILS = [
     #     "sniyas8675@gmail.com",
     #     "manojg0795@gmail.com",
     #     "nishanthchakkra@gmail.com"
     # ]
+    SENDER_EMAIL = "kevintexainnovates@gmail.com"
+    SENDER_PASSWORD = "cpqa kkdc vobg dhuv" 
     RECIPIENT_EMAILS = [
         "divyadharsinimurugesan@gmail.com",
-        # "aarthysm05@gmail.com"
-        
-        
+        "aarthysm05@gmail.com",
+        "sniyas8675@gmail.com",
+         "muthu8382@gmail.com" 
     ]
+    #  
     # from datetime import datetime
-# "sniyas8675@gmail.com","kalaiselvi29778@gmail.com"
     # timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-
-    
     # subject = " Bad Images Report"
     # # body = f"Dear Team,\n\nPlease find attached the defect report and bad images report for review.\n\nDrawing Frame No: 3 \nCurrently running metiral: Radha\nMetiral Color: Yellow\n\nBest Regards,\nYour Automated System\n\nDate Time :{timestamp}\n\nDefect images attached below:"
     # html_template = load_email_template()
@@ -122,7 +122,7 @@ def send_last_generated_pdf():
     return send_email_with_attachments(
         pdf_path,
         machine_no="M1",
-        frame_no="-",
+        frame_no="02",
         material="Hourly Invoice Report",
         color="-",
         defect_time=datetime.now().strftime("%d-%m-%Y %H:%M:%S")

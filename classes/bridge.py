@@ -58,7 +58,22 @@ class Bridge(QObject):
         self.last_prediction_interval_seconds = self.pr_time
         # self.pr_time = 1  # seconds
         self.process = None
-        self.prediction_live = False
+
+        try:
+            if os.path.exists(SETTINGS_FILE):
+                with open(SETTINGS_FILE, "r") as f:
+                    data = json.load(f)
+
+                self.prediction_live = data.get("prediction_live", False)
+
+            else:
+                self.prediction_live = False
+
+        except Exception as e:
+            print("❌ Error loading prediction_live:", e)
+            self.prediction_live = False
+  
+        # self.prediction_live = False
         self.reset_click = False
 
         self.count_time = QTimer()
@@ -562,6 +577,7 @@ class Bridge(QObject):
     def startCamera(self,process):
         self.prediction_live = True
         self.process = process
+        self.updatePredictionStatus()
         if not machine_status():
             return "Machine OFF"
 
@@ -682,12 +698,33 @@ class Bridge(QObject):
     @pyqtSlot()
     def stopCamera(self):
         try:
-            print("checking...123")
             self.prediction_live = False
+            self.updatePredictionStatus()
             self.camera_stop()
         except Exception as e:
             print("Camera Connection Error",e)
-        
+
+    def updatePredictionStatus(self):
+        try:
+            data = {}
+
+            # Read existing JSON
+            if os.path.exists(SETTINGS_FILE):
+                with open(SETTINGS_FILE, "r") as f:
+                    data = json.load(f)
+
+            # # Update prediction_live
+            # data["prediction_live"] = self.prediction_live
+            data["prediction_live"] = self.prediction_live
+
+            # Save JSON
+            with open(SETTINGS_FILE, "w") as f:
+                json.dump(data, f, indent=4)
+
+            print(f"✅ prediction_live = {self.prediction_live}")
+
+        except Exception as e:
+            print("❌ updatePredictionStatus error:", e)   
 
     def save_session_txt(self):
         try:
@@ -744,7 +781,7 @@ class Bridge(QObject):
             counts_data['reset_close'] = False
         
         machine = machine_status()
-        # print(self.prediction_live)
+        # print(self.prediction_live,machine)
         if (machine) and self.prediction_live:
             counts_data['prediction_run'] = True
         
@@ -1038,7 +1075,7 @@ class Bridge(QObject):
 
         elif status in ["defect", "strip missing"]:
             self.bad += 1
-            break_on()
+            # break_on()
 
         # Replace frame with processed image 
         # if processed_img is not None:
