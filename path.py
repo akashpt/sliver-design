@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
-
+IS_WINDOWS = sys.platform.startswith("win")
+IS_LINUX = sys.platform.startswith("linux")
 # =====================================================
 # CORE PATH HELPERS
 # =====================================================
@@ -23,8 +24,17 @@ def run_path() -> Path:
     - Normal run   → project root
     - PyInstaller  → exe folder
     """
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent
+    if IS_WINDOWS:
+        if getattr(sys, "frozen", False):
+            return Path(sys.executable).resolve().parent
+
+        return Path.cwd()
+
+    elif IS_LINUX:
+        path = Path.home() / "Documents"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
     return Path.cwd()
 
 

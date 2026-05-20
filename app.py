@@ -44,7 +44,8 @@ def load_app_settings():
         "exposure": 6000,
         "min_exposure": 31,
         "max_exposure": 4063201,
-        "lastSaved": datetime.now().isoformat()
+        "lastSaved": datetime.now().isoformat(),
+        "prediction_live": False
     }
 
     try:
@@ -84,7 +85,8 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("Sliver Design System")
-        self.resize(1200, 800)
+        # self.resize(1200, 800)
+        self.showFullScreen()
 
         # WebEngine View
         self.view = QWebEngineView()
